@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CreateSurveyUseCase, CreateSurveyRequest } from '@/application/use-cases/CreateSurveyUseCase';
 import { DomainError } from '@/domain/shared/errors/DomainError';
+import { withAuth, withRole, requireUser } from '@/lib/auth/withAuth';
 
 // This will be injected via DI container in a real implementation
 // For now, we'll use placeholder implementations
@@ -16,9 +17,13 @@ import {
 
 /**
  * POST /api/surveys - Create a new survey
+ * Protected route: requires authentication and survey creation permission
  */
-export async function POST(request: NextRequest) {
+async function createSurvey(request: NextRequest) {
   try {
+    // Get authenticated user
+    const user = requireUser(request);
+    
     // Parse request body
     const body = await request.json();
     
@@ -30,18 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
-
-    // Create request DTO
+    // Create request DTO using authenticated user ID
     const createSurveyRequest: CreateSurveyRequest = {
       title: body.title,
       description: body.description || '',
-      userId: body.userId,
+      userId: user.getId(), // Use authenticated user's ID
       useAI: body.useAI || false,
       aiGenerationParams: body.aiGenerationParams,
       questions: body.questions || []
@@ -104,10 +102,15 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/surveys - Get surveys list (placeholder)
+ * Protected route: requires authentication and survey read permission
  */
-export async function GET() {
+async function getSurveys(request: NextRequest) {
   try {
+    // Get authenticated user
+    const user = requireUser(request);
+    
     // This is a placeholder - would implement GetSurveysUseCase
+    // In real implementation, filter surveys by user.getId()
     const surveys = [
       {
         id: 'survey_demo_123',
@@ -115,7 +118,8 @@ export async function GET() {
         description: 'A demo survey created with IntelliQuest',
         questionCount: 3,
         isActive: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        userId: user.getId()
       }
     ];
 
@@ -128,3 +132,7 @@ export async function GET() {
     );
   }
 } 
+
+// Export protected handlers
+export const POST = withRole(['surveys:create'], createSurvey);
+export const GET = withAuth(getSurveys); 

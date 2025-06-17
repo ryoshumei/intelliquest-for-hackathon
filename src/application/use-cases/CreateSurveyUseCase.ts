@@ -139,6 +139,9 @@ export interface CreateSurveyRequest {
   useAI?: boolean;
   aiGenerationParams?: AIGenerationParams;
   questions?: CreateQuestionRequest[];
+  // Auth-related fields
+  isAuthenticated?: boolean;
+  userDisplayName?: string;
 }
 
 export interface CreateQuestionRequest {
