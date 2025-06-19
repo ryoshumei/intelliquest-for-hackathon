@@ -3,9 +3,9 @@ import { CreateSurveyUseCase, CreateSurveyRequest } from '@/application/use-case
 import { DomainError } from '@/domain/shared/errors/DomainError';
 import { withAuth, withRole, requireUser } from '@/lib/auth/withAuth';
 
-// This will be injected via DI container in a real implementation
-// For now, we'll use placeholder implementations
-import { MockSurveyRepository } from '@/infrastructure/repositories/MockSurveyRepository';
+// Repository and service implementations
+import { FirebaseSurveyRepository } from '@/infrastructure/repositories/FirebaseSurveyRepository';
+// import { MockSurveyRepository } from '@/infrastructure/repositories/MockSurveyRepository';
 import { MockAIQuestionGeneratorService } from '@/infrastructure/external-services/MockAIQuestionGeneratorService';
 import { MockEventBus } from '@/infrastructure/services/MockEventBus';
 import {
@@ -45,8 +45,8 @@ async function createSurvey(request: NextRequest) {
       questions: body.questions || []
     };
 
-    // Initialize dependencies (in real app, this would be via DI container)
-    const surveyRepository = new MockSurveyRepository();
+    // Initialize dependencies with real Firebase repository
+    const surveyRepository = new FirebaseSurveyRepository(user.getId());
     const aiService = new MockAIQuestionGeneratorService();
     const eventBus = new MockEventBus();
 
@@ -109,25 +109,52 @@ async function getSurveys(request: NextRequest) {
     // Get authenticated user
     const user = requireUser(request);
     
-    // This is a placeholder - would implement GetSurveysUseCase
-    // In real implementation, filter surveys by user.getId()
-    const surveys = [
-      {
-        id: 'survey_demo_123',
-        title: 'Demo Survey',
-        description: 'A demo survey created with IntelliQuest',
-        questionCount: 3,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        userId: user.getId()
-      }
-    ];
+    // Initialize Firebase repository with user context
+    const surveyRepository = new FirebaseSurveyRepository(user.getId());
+    
+    // Get query parameters for pagination
+    const url = new URL(request.url);
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const limit = parseInt(url.searchParams.get('limit') || '10');
+    const isActive = url.searchParams.get('isActive');
+    
+    // Build filters
+    const filters = {
+      userId: user.getId(),
+      ...(isActive !== null && { isActive: isActive === 'true' })
+    };
+    
+    // Fetch surveys with pagination
+    const result = await surveyRepository.findWithPagination(offset, limit, filters);
+    
+    // Transform to API response format
+    const surveys = result.surveys.map(survey => ({
+      id: survey.getId(),
+      title: survey.getTitle(),
+      description: survey.getDescription(),
+      questionCount: survey.getQuestionCount(),
+      isActive: survey.getIsActive(),
+      createdAt: survey.getCreatedAt().toISOString(),
+      updatedAt: survey.getUpdatedAt().toISOString(),
+      userId: user.getId()
+    }));
 
-    return NextResponse.json({ surveys });
+    return NextResponse.json({
+      surveys,
+      pagination: {
+        offset,
+        limit,
+        total: result.total,
+        hasMore: result.hasMore
+      }
+    });
   } catch (error) {
     console.error('Get surveys error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch surveys' },
+      { 
+        error: 'Failed to fetch surveys',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

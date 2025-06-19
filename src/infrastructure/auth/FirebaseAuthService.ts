@@ -365,6 +365,35 @@ export class FirebaseAuthService implements AuthService {
   }
 
   /**
+   * Verify ID token and get user (for API middleware)
+   * Note: This is a simplified verification for client-side auth
+   * In production, you'd want proper server-side token verification
+   */
+  async verifyIdToken(idToken: string): Promise<User | null> {
+    try {
+      // For now, we'll use a simple approach
+      // In production, you'd verify the token server-side
+      const auth = this.auth;
+      if (!auth) return null;
+
+      // Check if there's a current user and the token belongs to them
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return null;
+
+      // Get the current user's token and compare (basic verification)
+      const currentToken = await getIdToken(firebaseUser);
+      if (currentToken === idToken) {
+        return await this.mapFirebaseUserToDomain(firebaseUser);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('🚨 FirebaseAuth: Token verification failed:', error);
+      return null;
+    }
+  }
+
+  /**
    * Map Firebase user to domain User entity
    */
   private async mapFirebaseUserToDomain(firebaseUser: FirebaseUser): Promise<User> {

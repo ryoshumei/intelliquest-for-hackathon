@@ -1,0 +1,116 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is the owner
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function to check if user can read resource
+    function canRead(resource) {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+    
+    // Helper function to check if user can write resource
+    function canWrite(resource) {
+      return isAuthenticated() && request.auth.uid == resource.data.ownerId;
+    }
+    
+    // Users collection - users can only access their own user document
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Surveys collection - user data isolation
+    match /surveys/{surveyId} {
+      // Read: Only survey owner can read
+      allow read: if canRead(resource);
+      
+      // Create: Authenticated users can create surveys for themselves
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == request.resource.data.ownerId &&
+                       validateSurveyData(request.resource.data);
+      
+      // Update: Only survey owner can update their surveys
+      allow update: if canWrite(resource) && 
+                       request.auth.uid == request.resource.data.ownerId &&
+                       validateSurveyData(request.resource.data);
+      
+      // Delete: Only survey owner can delete their surveys
+      allow delete: if canWrite(resource);
+    }
+    
+    // Responses collection - survey responses with privacy controls
+    match /responses/{responseId} {
+      // Read: Survey owner can read responses to their surveys
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/surveys/$(resource.data.surveyId)) &&
+                     get(/databases/$(database)/documents/surveys/$(resource.data.surveyId)).data.ownerId == request.auth.uid;
+      
+      // Create: Anyone can create responses (supports anonymous responses)
+      allow create: if validateResponseData(request.resource.data);
+      
+      // Update/Delete: Only response creator (if logged in) or survey owner
+      allow update, delete: if (resource.data.respondentId != null && 
+                                isOwner(resource.data.respondentId)) ||
+                               (isAuthenticated() && 
+                                exists(/databases/$(database)/documents/surveys/$(resource.data.surveyId)) &&
+                                get(/databases/$(database)/documents/surveys/$(resource.data.surveyId)).data.ownerId == request.auth.uid);
+    }
+    
+    // Validation functions
+    function validateSurveyData(data) {
+      return data.keys().hasAll(['title', 'description', 'ownerId', 'questions', 'isActive', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.ownerId is string &&
+             data.questions is list && data.questions.size() <= 50 &&
+             data.isActive is bool &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             validateQuestions(data.questions);
+    }
+    
+    function validateQuestions(questions) {
+      return questions.size() == 0 || 
+             questions.map(q => validateQuestion(q)).reduce(true, function(acc, isValid) {
+               return acc && isValid;
+             });
+    }
+    
+    function validateQuestion(question) {
+      return question.keys().hasAll(['id', 'text', 'type', 'isRequired', 'isAIGenerated', 'order', 'createdAt']) &&
+             question.id is string && question.id.size() > 0 &&
+             question.text is string && question.text.size() > 0 && question.text.size() <= 500 &&
+             question.type is string && question.type in ['text', 'multiple-choice', 'single-choice', 'scale', 'yes-no'] &&
+             question.isRequired is bool &&
+             question.isAIGenerated is bool &&
+             question.order is number && question.order >= 0 &&
+             question.createdAt is timestamp &&
+             (question.type in ['text', 'yes-no'] || 
+              (question.keys().hasAny(['options']) && question.options is list && question.options.size() <= 10));
+    }
+    
+    function validateResponseData(data) {
+      return data.keys().hasAll(['surveyId', 'answers', 'submittedAt']) &&
+             data.surveyId is string && data.surveyId.size() > 0 &&
+             data.answers is map &&
+             data.submittedAt is timestamp &&
+             (!data.keys().hasAny(['respondentId']) || data.respondentId is string) &&
+             (!data.keys().hasAny(['ipAddress']) || data.ipAddress is string);
+    }
+    
+    // Deny access to any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
