@@ -45,3 +45,5 @@ next-env.d.ts
 .cursor/
 .cursorignore
 .vscode/
+/docs
+scripts/
