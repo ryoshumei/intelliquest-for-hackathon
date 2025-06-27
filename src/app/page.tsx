@@ -154,6 +154,12 @@ export default function Home() {
                   Welcome, {user?.displayName}
                 </span>
                 <Link
+                  href="/create-survey"
+                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  Create Survey
+                </Link>
+                <Link
                   href="/dashboard"
                   className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
                 >

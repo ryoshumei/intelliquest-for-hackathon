@@ -28,6 +28,13 @@ export class SurveyId {
   }
 
   /**
+   * Create SurveyId from existing string (alias for fromString)
+   */
+  static create(value: string): SurveyId {
+    return new SurveyId(value);
+  }
+
+  /**
    * Validate survey ID format
    */
   private validate(value: string): void {

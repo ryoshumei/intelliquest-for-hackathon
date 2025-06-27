@@ -48,8 +48,8 @@ service cloud.firestore {
       allow delete: if canWrite(resource);
     }
     
-    // Responses collection - survey responses with privacy controls
-    match /responses/{responseId} {
+    // Survey responses collection
+    match /survey_responses/{responseId} {
       // Read: Survey owner can read responses to their surveys
       allow read: if isAuthenticated() && 
                      exists(/databases/$(database)/documents/surveys/$(resource.data.surveyId)) &&
@@ -81,31 +81,22 @@ service cloud.firestore {
     
     function validateQuestions(questions) {
       return questions.size() == 0 || 
-             questions.map(q => validateQuestion(q)).reduce(true, function(acc, isValid) {
-               return acc && isValid;
-             });
+             questions.map(q, validateQuestion(q)).hasAll([true]);
     }
     
     function validateQuestion(question) {
-      return question.keys().hasAll(['id', 'text', 'type', 'isRequired', 'isAIGenerated', 'order', 'createdAt']) &&
+      return question.keys().hasAll(['id', 'text', 'type', 'isRequired']) &&
              question.id is string && question.id.size() > 0 &&
              question.text is string && question.text.size() > 0 && question.text.size() <= 500 &&
              question.type is string && question.type in ['text', 'multiple-choice', 'single-choice', 'scale', 'yes-no'] &&
-             question.isRequired is bool &&
-             question.isAIGenerated is bool &&
-             question.order is number && question.order >= 0 &&
-             question.createdAt is timestamp &&
-             (question.type in ['text', 'yes-no'] || 
-              (question.keys().hasAny(['options']) && question.options is list && question.options.size() <= 10));
+             question.isRequired is bool;
     }
     
     function validateResponseData(data) {
       return data.keys().hasAll(['surveyId', 'answers', 'submittedAt']) &&
              data.surveyId is string && data.surveyId.size() > 0 &&
              data.answers is map &&
-             data.submittedAt is timestamp &&
-             (!data.keys().hasAny(['respondentId']) || data.respondentId is string) &&
-             (!data.keys().hasAny(['ipAddress']) || data.ipAddress is string);
+             data.submittedAt is timestamp;
     }
     
     // Deny access to any other collections

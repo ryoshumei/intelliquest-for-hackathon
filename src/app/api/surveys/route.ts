@@ -6,6 +6,7 @@ import { withAuth, withRole, requireUser } from '@/lib/auth/withAuth';
 // Repository and service implementations
 import { FirebaseSurveyRepository } from '@/infrastructure/repositories/FirebaseSurveyRepository';
 // import { MockSurveyRepository } from '@/infrastructure/repositories/MockSurveyRepository';
+import { VertexAIQuestionGeneratorService } from '@/infrastructure/external-services/VertexAIQuestionGeneratorService';
 import { MockAIQuestionGeneratorService } from '@/infrastructure/external-services/MockAIQuestionGeneratorService';
 import { MockEventBus } from '@/infrastructure/services/MockEventBus';
 import {
@@ -45,9 +46,19 @@ async function createSurvey(request: NextRequest) {
       questions: body.questions || []
     };
 
-    // Initialize dependencies with real Firebase repository
+    // Initialize dependencies with real Firebase repository and Vertex AI
     const surveyRepository = new FirebaseSurveyRepository(user.getId());
-    const aiService = new MockAIQuestionGeneratorService();
+    
+    // Use Vertex AI in production, Mock for fallback
+    let aiService;
+    try {
+      aiService = new VertexAIQuestionGeneratorService();
+      console.log('✅ Using Vertex AI Question Generator Service');
+    } catch (error) {
+      console.warn('⚠️ Vertex AI initialization failed, falling back to Mock service:', error);
+      aiService = new MockAIQuestionGeneratorService();
+    }
+    
     const eventBus = new MockEventBus();
 
     // Register event handlers to demonstrate EventBus functionality

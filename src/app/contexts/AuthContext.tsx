@@ -40,6 +40,7 @@ interface AuthContextType extends AuthState {
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   clearError: () => void;
+  getToken: () => Promise<string | null>;
 }
 
 // Initial state
@@ -260,6 +261,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
+  // Get current user's ID token
+  const getToken = async (): Promise<string | null> => {
+    if (!auth?.currentUser) {
+      return null;
+    }
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      return token;
+    } catch (error) {
+      console.error('🚨 AuthContext: Failed to get user token:', error);
+      return null;
+    }
+  };
+
   const value: AuthContextType = {
     ...state,
     login,
@@ -267,6 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     forgotPassword,
     clearError,
+    getToken,
   };
 
   return (
