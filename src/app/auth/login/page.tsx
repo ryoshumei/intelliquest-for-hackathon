@@ -24,7 +24,15 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(email, password);
-      router.push('/dashboard');
+      
+      // Check for stored redirect URL
+      const storedRedirect = sessionStorage.getItem('redirectAfterLogin');
+      if (storedRedirect) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        router.push(storedRedirect);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (error) {
       // Error is handled by AuthContext
     } finally {

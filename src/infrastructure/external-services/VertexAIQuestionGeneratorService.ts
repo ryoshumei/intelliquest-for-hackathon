@@ -165,11 +165,30 @@ export class VertexAIQuestionGeneratorService implements AIQuestionGeneratorServ
           // Map AI question type to our domain QuestionType
           const questionType = this.mapQuestionType(qData.type);
           
+          // Ensure correct options format based on question type
+          let options = qData.options || [];
+          
+          // Scale questions must have exactly 2 options (min and max labels)
+          if (questionType.isScale()) {
+            if (options.length === 0) {
+              options = ["Poor", "Excellent"];
+            } else if (options.length === 1) {
+              options = [options[0], "Excellent"];
+            } else if (options.length > 2) {
+              options = [options[0], options[options.length - 1]];
+            }
+          }
+          
+          // Yes/No questions should have exactly 2 options
+          if (questionType.getValue() === 'yes_no') {
+            options = ["Yes", "No"];
+          }
+          
           // Use the AI factory method to create questions
           const question = Question.createAIGenerated(
             qData.text,
             questionType,
-            qData.options || []
+            options
           );
           
           questions.push(question);
@@ -221,6 +240,11 @@ export class VertexAIQuestionGeneratorService implements AIQuestionGeneratorServ
         text: "Would you recommend us to others?",
         type: QuestionType.yesNo(),
         options: ["Yes", "No"]
+      },
+      {
+        text: "Which of the following features do you find most valuable?",
+        type: QuestionType.multipleChoice(),
+        options: ["Ease of use", "Customer support", "Price", "Quality", "Other"]
       }
     ];
 
@@ -241,7 +265,10 @@ export class VertexAIQuestionGeneratorService implements AIQuestionGeneratorServ
         throw new Error('AI service not initialized');
       }
 
-      console.log(`🎯 Generating ${params.questionCount} questions about: ${params.topic}`);
+      console.log(`🎯 Generating ${params.questionCount} questions for: ${params.title}`);
+      if (params.description) {
+        console.log(`📝 Description: ${params.description}`);
+      }
       if (params.targetAudience) {
         console.log(`👥 Target audience: ${params.targetAudience}`);
       }
@@ -312,8 +339,13 @@ export class VertexAIQuestionGeneratorService implements AIQuestionGeneratorServ
       ? `Survey goal: ${params.surveyGoal}.`
       : '';
 
-    return `Generate exactly ${params.questionCount} high-quality survey questions about "${params.topic}".
+    const descriptionContext = params.description
+      ? `Survey description: ${params.description}.`
+      : '';
 
+    return `Generate exactly ${params.questionCount} high-quality survey questions for a survey titled "${params.title}".
+
+${descriptionContext}
 ${audienceContext}
 ${typesContext}
 ${goalContext}
@@ -330,20 +362,21 @@ Requirements:
 
 2. Question types:
    - "multiple_choice": Include 3-5 relevant options
-   - "rating": Use scale questions (will be converted to rating scale)
-   - "text": Set options to null
-   - "boolean": Use for yes/no questions
+   - "rating": Use scale questions, provide exactly 2 options (min and max labels like ["Poor", "Excellent"])
+   - "text": Set options to null or empty array
+   - "boolean": Use for yes/no questions, will automatically get ["Yes", "No"] options
 
 3. Make questions:
    - Clear and unambiguous
-   - Relevant to the topic
+   - Relevant to the survey title and description
    - Appropriate for the target audience
    - Non-leading and neutral
    - Actionable for data collection
 
 4. Return ONLY the JSON array, no additional text or explanation.
 
-Topic: ${params.topic}
+Title: ${params.title}
+Description: ${params.description || 'None provided'}
 Count: ${params.questionCount}`;
   }
 

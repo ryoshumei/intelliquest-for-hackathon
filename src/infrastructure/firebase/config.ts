@@ -7,16 +7,27 @@ import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/fire
  * Initializes Firebase services for IntelliQuest
  */
 
+// Fallback configuration for development/testing when env vars are not available
+const fallbackConfig = {
+  apiKey: "AIzaSyBTzwA5k6-CDOuQ7-AdjiP7klMFm_r70-0",
+  authDomain: "intelliquest-hackathon.firebaseapp.com",
+  projectId: "intelliquest-hackathon",
+  storageBucket: "intelliquest-hackathon.firebasestorage.app",
+  messagingSenderId: "208023840695",
+  appId: "1:208023840695:web:62cd35eccc832f6e9d2a32",
+  measurementId: "G-M3BFHBD8F6"
+};
+
 // Firebase project configuration
 // These values should be set in environment variables for security
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || fallbackConfig.apiKey,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || fallbackConfig.projectId,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || fallbackConfig.messagingSenderId,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || fallbackConfig.appId,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || fallbackConfig.measurementId,
 };
 
 // Validate required configuration
@@ -30,19 +41,13 @@ const requiredEnvVars = [
 ];
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+const usingFallbackConfig = missingEnvVars.length > 0;
 
-// Only log error if we're actually missing config AND Firebase is needed
-if (missingEnvVars.length > 0) {
-  // Check if we have valid Firebase config from environment
-  const hasValidConfig = firebaseConfig.apiKey && firebaseConfig.projectId;
-  
-  if (!hasValidConfig) {
-    console.error('🚨 Missing required Firebase environment variables:', missingEnvVars);
-    console.log('📝 Please check your .env.local file and ensure all Firebase variables are set');
-  } else {
-    // Environment variables are available, just the check is running at wrong time
-    console.log('✅ Firebase environment variables loaded successfully');
-  }
+if (usingFallbackConfig) {
+  console.log('⚠️  Using fallback Firebase configuration (env vars not available)');
+  console.log('🔧 Missing env vars:', missingEnvVars);
+} else {
+  console.log('✅ Firebase environment variables loaded successfully');
 }
 
 // Initialize Firebase App (singleton pattern)
@@ -54,17 +59,24 @@ let db: Firestore | null = null;
 let emulatorsConnected = false;
 
 // Initialize Firebase regardless of environment (client or server)
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-  console.log('🔥 Firebase app initialized');
-} else {
-  app = getApp();
-  console.log('🔥 Firebase app already initialized');
+try {
+  if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+    console.log('🔥 Firebase app initialized');
+  } else {
+    app = getApp();
+    console.log('🔥 Firebase app already initialized');
+  }
+  
+  // Initialize Firebase Services
+  auth = getAuth(app);
+  db = getFirestore(app);
+  
+  console.log('🔥 Firebase services initialized successfully');
+} catch (error) {
+  console.error('🚨 Firebase initialization failed:', error);
+  throw error;
 }
-
-// Initialize Firebase Services
-auth = getAuth(app);
-db = getFirestore(app);
 
 export { auth, db };
 
@@ -112,7 +124,8 @@ export default app;
  * Firebase configuration status
  */
 export const firebaseConfigStatus = {
-  isConfigured: missingEnvVars.length === 0,
+  isConfigured: true, // Always true now with fallback config
+  usingFallback: usingFallbackConfig,
   missingVariables: missingEnvVars,
   projectId: firebaseConfig.projectId,
   authDomain: firebaseConfig.authDomain,
@@ -141,6 +154,7 @@ export const getFirebaseProjectInfo = () => {
 // Log configuration status
 console.log('🔥 Firebase Configuration Status:', {
   configured: firebaseConfigStatus.isConfigured,
+  usingFallback: firebaseConfigStatus.usingFallback,
   projectId: firebaseConfigStatus.projectId,
   development: firebaseConfigStatus.isDevelopment,
   emulators: firebaseConfigStatus.useEmulators

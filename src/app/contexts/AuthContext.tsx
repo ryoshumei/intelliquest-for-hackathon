@@ -91,25 +91,83 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Add a timeout to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (state.isLoading) {
+        console.warn('⚠️ AuthContext: Authentication check timeout, setting to not authenticated');
+        dispatch({ type: 'SET_USER', payload: null });
+      }
+    }, 10000); // 10 seconds timeout
+
+    return () => clearTimeout(timeout);
+  }, [state.isLoading]);
+
   // Listen for auth state changes
   useEffect(() => {
+    console.log('🔍 AuthContext: Setting up auth state listener...');
+    
     if (!auth) {
-      console.error('🚨 Firebase auth not initialized');
-      dispatch({ type: 'SET_ERROR', payload: 'Authentication service not available' });
+      console.error('🚨 Firebase auth not initialized, setting to not authenticated');
+      dispatch({ type: 'SET_USER', payload: null });
       return;
     }
 
+    console.log('✅ AuthContext: Firebase auth is available, setting up listener');
+
+    // Immediately check current user
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      console.log('✅ AuthContext: Current user found immediately:', currentUser.email);
+      const user = mapFirebaseUser(currentUser);
+      dispatch({ type: 'SET_USER', payload: user });
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      console.log('🔄 AuthContext: Auth state changed', firebaseUser ? 'User logged in' : 'No user');
+      
       if (firebaseUser) {
         const user = mapFirebaseUser(firebaseUser);
+        console.log('✅ AuthContext: Setting authenticated user:', user.email);
         dispatch({ type: 'SET_USER', payload: user });
       } else {
+        console.log('🚪 AuthContext: No user, setting to null');
         dispatch({ type: 'SET_USER', payload: null });
       }
+    }, (error) => {
+      console.error('🚨 AuthContext: Auth state change error:', error);
+      dispatch({ type: 'SET_USER', payload: null });
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('🧹 AuthContext: Cleaning up auth listener');
+      unsubscribe();
+    };
   }, []);
+
+  // Set up periodic token refresh for authenticated users
+  useEffect(() => {
+    if (!state.isAuthenticated || !auth?.currentUser) {
+      return;
+    }
+
+    // Refresh token every 30 minutes to keep it fresh
+    const tokenRefreshInterval = setInterval(async () => {
+      try {
+        console.log('🔄 AuthContext: Performing periodic token refresh');
+        await auth?.currentUser?.getIdToken(true);
+        console.log('✅ AuthContext: Token refreshed successfully');
+             } catch (error) {
+         console.error('🚨 AuthContext: Failed to refresh token:', error);
+         // If refresh fails, user might need to re-authenticate
+         if (auth) {
+           await signOut(auth);
+         }
+       }
+    }, 30 * 60 * 1000); // 30 minutes
+
+    return () => clearInterval(tokenRefreshInterval);
+  }, [state.isAuthenticated]);
 
   // Login function
   const login = async (email: string, password: string): Promise<void> => {
@@ -261,17 +319,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
-  // Get current user's ID token
-  const getToken = async (): Promise<string | null> => {
+  // Get current user's ID token with automatic refresh
+  const getToken = async (forceRefresh = false): Promise<string | null> => {
     if (!auth?.currentUser) {
+      console.warn('🚨 AuthContext: No authenticated user found');
       return null;
     }
 
     try {
-      const token = await auth.currentUser.getIdToken();
+      // Force refresh token if requested or if we suspect it might be expired
+      const token = await auth.currentUser.getIdToken(forceRefresh);
+      console.log('✅ AuthContext: Successfully retrieved token');
       return token;
-    } catch (error) {
+    } catch (error: any) {
       console.error('🚨 AuthContext: Failed to get user token:', error);
+      
+      // If token retrieval fails, try to refresh once
+      if (!forceRefresh && error?.code === 'auth/id-token-expired') {
+        console.log('🔄 AuthContext: Token expired, attempting refresh...');
+        return await getToken(true);
+      }
+      
+             // If refresh also fails, user needs to re-authenticate
+       if (error?.code === 'auth/id-token-expired' || error?.code === 'auth/id-token-revoked') {
+         console.log('🚨 AuthContext: Token expired and refresh failed, logging out user');
+         if (auth) {
+           await signOut(auth);
+         }
+       }
+      
       return null;
     }
   };

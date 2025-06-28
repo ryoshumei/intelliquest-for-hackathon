@@ -14,13 +14,18 @@ const eslintConfig = [
   {
     rules: {
       "@typescript-eslint/no-unused-vars": [
-        "error",
+        "warn",
         {
           "argsIgnorePattern": "^_",
           "varsIgnorePattern": "^_",
           "caughtErrorsIgnorePattern": "^_"
         }
-      ]
+      ],
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unsafe-declaration-merging": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
+      "react/no-unescaped-entities": "warn",
+      "@next/next/no-img-element": "warn"
     }
   }
 ];

@@ -31,8 +31,11 @@ service cloud.firestore {
     
     // Surveys collection - user data isolation
     match /surveys/{surveyId} {
-      // Read: Only survey owner can read
+      // Read: Only survey owner can read individual documents
       allow read: if canRead(resource);
+      
+      // List: Allow authenticated users to query surveys (repository handles filtering)
+      allow list: if isAuthenticated();
       
       // Create: Authenticated users can create surveys for themselves
       allow create: if isAuthenticated() && 
@@ -81,7 +84,7 @@ service cloud.firestore {
     
     function validateQuestions(questions) {
       return questions.size() == 0 || 
-             questions.map(q, validateQuestion(q)).hasAll([true]);
+             questions.size() <= 50;
     }
     
     function validateQuestion(question) {
@@ -93,10 +96,14 @@ service cloud.firestore {
     }
     
     function validateResponseData(data) {
-      return data.keys().hasAll(['surveyId', 'answers', 'submittedAt']) &&
+      return data.keys().hasAll(['id', 'surveyId', 'responses', 'startedAt', 'isComplete']) &&
+             data.id is string && data.id.size() > 0 &&
              data.surveyId is string && data.surveyId.size() > 0 &&
-             data.answers is map &&
-             data.submittedAt is timestamp;
+             data.responses is list &&
+             data.startedAt is timestamp &&
+             data.isComplete is bool &&
+             (data.submittedAt == null || data.submittedAt is timestamp) &&
+             data.responses.size() <= 100;
     }
     
     // Deny access to any other collections

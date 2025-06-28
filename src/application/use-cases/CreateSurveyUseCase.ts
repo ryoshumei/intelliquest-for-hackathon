@@ -40,8 +40,15 @@ export class CreateSurveyUseCase {
 
       // 4. Generate AI questions if requested
       if (request.useAI && request.aiGenerationParams) {
+        // Pass the survey title and description to AI generation
+        const aiParams = {
+          ...request.aiGenerationParams,
+          title: request.title,
+          description: request.description
+        };
+        
         const aiQuestions = await this.generateAIQuestions(
-          request.aiGenerationParams,
+          aiParams,
           survey.getQuestionCount()
         );
         
@@ -80,8 +87,9 @@ export class CreateSurveyUseCase {
 
     if (request.useAI && request.aiGenerationParams) {
       const params = request.aiGenerationParams;
-      if (!params.topic?.trim()) {
-        throw DomainError.validation('AI generation topic is required');
+      // Title will be taken from request.title, so validate that instead
+      if (!request.title?.trim()) {
+        throw DomainError.validation('Survey title is required for AI generation');
       }
       if (params.questionCount <= 0 || params.questionCount > 20) {
         throw DomainError.validation('AI question count must be between 1 and 20');
@@ -152,7 +160,8 @@ export interface CreateQuestionRequest {
 }
 
 export interface AIGenerationParams {
-  topic: string;
+  title: string;
+  description?: string;
   questionCount: number;
   questionTypes?: string[];
   targetAudience?: string;

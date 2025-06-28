@@ -6,12 +6,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SubmitSurveyResponseUseCase, SubmitResponseParams } from '../../../../../application/use-cases/SubmitSurveyResponseUseCase';
 import { FirebaseSurveyRepository } from '../../../../../infrastructure/repositories/FirebaseSurveyRepository';
+import { AdminFirebaseSurveyRepository } from '../../../../../infrastructure/repositories/AdminFirebaseSurveyRepository';
 import { FirebaseSurveyResponseRepository } from '../../../../../infrastructure/repositories/FirebaseSurveyResponseRepository';
+import { AdminFirebaseSurveyResponseRepository } from '../../../../../infrastructure/repositories/AdminFirebaseSurveyResponseRepository';
 import { MockEventBus } from '../../../../../infrastructure/services/MockEventBus';
 
 // Initialize dependencies
-const surveyRepository = new FirebaseSurveyRepository();
-const responseRepository = new FirebaseSurveyResponseRepository();
+const surveyRepository = new AdminFirebaseSurveyRepository();
+const responseRepository = new AdminFirebaseSurveyResponseRepository();
 const eventBus = new MockEventBus();
 const submitResponseUseCase = new SubmitSurveyResponseUseCase(
   surveyRepository,

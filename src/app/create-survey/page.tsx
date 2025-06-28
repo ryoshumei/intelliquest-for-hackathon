@@ -39,6 +39,41 @@ interface Survey {
   questions: Question[];
 }
 
+// Helper function to map backend question types to frontend types
+function mapBackendTypeToFrontend(backendType: string): Question['type'] {
+  switch (backendType.toLowerCase()) {
+    case 'text':
+    case 'textarea':
+      return 'text';
+    case 'multiple_choice':
+    case 'single_choice':
+      return 'multiple_choice';
+    case 'scale':
+      return 'rating';
+    case 'yes_no':
+      return 'yes_no';
+    default:
+      console.warn(`Unknown backend type: ${backendType}, defaulting to text`);
+      return 'text';
+  }
+}
+
+function mapFrontendTypeToBackend(frontendType: Question['type']): string {
+  switch (frontendType) {
+    case 'text':
+      return 'text';
+    case 'multiple_choice':
+      return 'multiple_choice';
+    case 'rating':
+      return 'scale';
+    case 'yes_no':
+      return 'yes_no';
+    default:
+      console.warn(`Unknown frontend type: ${frontendType}, defaulting to text`);
+      return 'text';
+  }
+}
+
 export default function CreateSurveyPage() {
   const { getToken } = useAuth();
   
@@ -56,7 +91,7 @@ export default function CreateSurveyPage() {
   });
 
   const [isAIDialogOpen, setIsAIDialogOpen] = useState(false);
-  const [aiTopic, setAiTopic] = useState('');
+
   const [aiQuestionCount, setAiQuestionCount] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -100,7 +135,10 @@ export default function CreateSurveyPage() {
   };
 
   const generateAIQuestions = async () => {
-    if (!aiTopic.trim()) return;
+    if (!survey.title.trim()) {
+      alert('Please enter a survey title first');
+      return;
+    }
     
     setIsGenerating(true);
     
@@ -118,32 +156,38 @@ export default function CreateSurveyPage() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          title: survey.title || 'AI Generated Survey',
-          description: survey.description || `Survey about ${aiTopic}`,
+          title: survey.title,
+          description: survey.description || 'Survey questions',
           useAI: true,
           aiGenerationParams: {
-            topic: aiTopic,
             questionCount: aiQuestionCount,
             targetAudience: 'general',
-            questionTypes: ['text', 'multiple_choice', 'rating'],
+            questionTypes: ['text', 'multiple_choice', 'rating'].map(type => mapFrontendTypeToBackend(type as Question['type'])),
             surveyGoal: 'Generate questions for survey creation'
           }
         }),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired or invalid, redirect to login
+          console.warn('🚨 Authentication failed, redirecting to login');
+          window.location.href = '/auth/login';
+          return;
+        }
         throw new Error('Failed to generate questions');
       }
 
       const data = await response.json();
       
-      // The API returns a survey object with questions
-      if (data.survey && data.survey.questions) {
+      // The API returns survey data directly with questions array
+      if (data && data.questions && Array.isArray(data.questions)) {
         // Convert API response to our Question format
-        const aiQuestions: Question[] = data.survey.questions.map((q: { text: string; type: string; options?: string[] }, index: number) => ({
-          id: `ai-${Date.now()}-${index}`,
+        const aiQuestions: Question[] = data.questions.map((q: { id: string; text: string; type: string; options?: string[] }, index: number) => ({
+          id: q.id || `ai-${Date.now()}-${index}`,
           text: q.text,
-          type: q.type.toLowerCase().replace('_', '_') as Question['type'],
+          // Map backend types to frontend types
+          type: mapBackendTypeToFrontend(q.type),
           options: q.options || [],
           required: false
         }));
@@ -152,12 +196,14 @@ export default function CreateSurveyPage() {
           ...prev,
           questions: [...prev.questions, ...aiQuestions]
         }));
+        
+        console.log(`✅ Successfully added ${aiQuestions.length} AI-generated questions`);
       } else {
+        console.error('Invalid response format:', data);
         throw new Error('Invalid response format');
       }
 
       setIsAIDialogOpen(false);
-      setAiTopic('');
       setAiQuestionCount(5);
       
     } catch (error) {
@@ -198,13 +244,19 @@ export default function CreateSurveyPage() {
           useAI: false,
           questions: survey.questions.map(q => ({
             text: q.text,
-            type: q.type,
+            type: mapFrontendTypeToBackend(q.type),
             options: q.options || []
           }))
         }),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired or invalid, redirect to login
+          console.warn('🚨 Authentication failed, redirecting to login');
+          window.location.href = '/auth/login';
+          return;
+        }
         throw new Error('Failed to save survey');
       }
 
@@ -212,8 +264,8 @@ export default function CreateSurveyPage() {
       console.log('Survey saved successfully:', data);
       alert('Survey saved successfully!');
       
-      // Optionally redirect to dashboard
-      // window.location.href = '/dashboard';
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
       
     } catch (error) {
       console.error('Error saving survey:', error);
@@ -311,14 +363,10 @@ export default function CreateSurveyPage() {
                           </DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="ai-topic">Survey Topic</Label>
-                            <Input
-                              id="ai-topic"
-                              placeholder="e.g., customer satisfaction, employee feedback"
-                              value={aiTopic}
-                              onChange={(e) => setAiTopic(e.target.value)}
-                            />
+                          <div className="text-sm text-muted-foreground p-3 bg-muted rounded">
+                            <p><strong>Title:</strong> {survey.title || 'No title set'}</p>
+                            <p><strong>Description:</strong> {survey.description || 'No description set'}</p>
+                            <p className="mt-2">AI questions will be generated based on your survey title and description.</p>
                           </div>
                           
                           <div>
@@ -338,7 +386,7 @@ export default function CreateSurveyPage() {
                           
                           <Button 
                             onClick={generateAIQuestions} 
-                            disabled={!aiTopic.trim() || isGenerating}
+                            disabled={!survey.title.trim() || isGenerating}
                             className="w-full"
                           >
                             {isGenerating ? (

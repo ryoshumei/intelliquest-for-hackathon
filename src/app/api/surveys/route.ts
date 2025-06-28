@@ -5,9 +5,11 @@ import { withAuth, withRole, requireUser } from '@/lib/auth/withAuth';
 
 // Repository and service implementations
 import { FirebaseSurveyRepository } from '@/infrastructure/repositories/FirebaseSurveyRepository';
-// import { MockSurveyRepository } from '@/infrastructure/repositories/MockSurveyRepository';
+import { AdminFirebaseSurveyRepository } from '@/infrastructure/repositories/AdminFirebaseSurveyRepository';
+import { FirebaseSurveyResponseRepository } from '@/infrastructure/repositories/FirebaseSurveyResponseRepository';
+import { AdminFirebaseSurveyResponseRepository } from '@/infrastructure/repositories/AdminFirebaseSurveyResponseRepository';
+
 import { VertexAIQuestionGeneratorService } from '@/infrastructure/external-services/VertexAIQuestionGeneratorService';
-import { MockAIQuestionGeneratorService } from '@/infrastructure/external-services/MockAIQuestionGeneratorService';
 import { MockEventBus } from '@/infrastructure/services/MockEventBus';
 import {
   EmailNotificationHandler,
@@ -46,18 +48,12 @@ async function createSurvey(request: NextRequest) {
       questions: body.questions || []
     };
 
-    // Initialize dependencies with real Firebase repository and Vertex AI
-    const surveyRepository = new FirebaseSurveyRepository(user.getId());
+    // Initialize dependencies with Admin Firebase repository and Vertex AI
+    const surveyRepository = new AdminFirebaseSurveyRepository(user.getId());
     
-    // Use Vertex AI in production, Mock for fallback
-    let aiService;
-    try {
-      aiService = new VertexAIQuestionGeneratorService();
-      console.log('✅ Using Vertex AI Question Generator Service');
-    } catch (error) {
-      console.warn('⚠️ Vertex AI initialization failed, falling back to Mock service:', error);
-      aiService = new MockAIQuestionGeneratorService();
-    }
+    // Use Vertex AI for question generation
+    const aiService = new VertexAIQuestionGeneratorService();
+    console.log('✅ Using Vertex AI Question Generator Service');
     
     const eventBus = new MockEventBus();
 
@@ -120,8 +116,9 @@ async function getSurveys(request: NextRequest) {
     // Get authenticated user
     const user = requireUser(request);
     
-    // Initialize Firebase repository with user context
-    const surveyRepository = new FirebaseSurveyRepository(user.getId());
+    // Initialize Firebase repositories (use Admin SDK for server-side operations)
+    const surveyRepository = new AdminFirebaseSurveyRepository(user.getId());
+    const responseRepository = new AdminFirebaseSurveyResponseRepository();
     
     // Get query parameters for pagination
     const url = new URL(request.url);
@@ -138,20 +135,45 @@ async function getSurveys(request: NextRequest) {
     // Fetch surveys with pagination
     const result = await surveyRepository.findWithPagination(offset, limit, filters);
     
-    // Transform to API response format
-    const surveys = result.surveys.map(survey => ({
-      id: survey.getId(),
-      title: survey.getTitle(),
-      description: survey.getDescription(),
-      questionCount: survey.getQuestionCount(),
-      isActive: survey.getIsActive(),
-      createdAt: survey.getCreatedAt().toISOString(),
-      updatedAt: survey.getUpdatedAt().toISOString(),
-      userId: user.getId()
-    }));
+    // Transform to API response format and get response counts
+    const surveysWithCounts = await Promise.all(
+      result.surveys.map(async (survey) => {
+        try {
+          // Get response count for each survey
+          const responses = await responseRepository.findBySurveyId(survey.getId());
+          const responseCount = responses.length;
+          
+          return {
+            id: survey.getId(),
+            title: survey.getTitle(),
+            description: survey.getDescription(),
+            questionCount: survey.getQuestionCount(),
+            isActive: survey.getIsActive(),
+            createdAt: survey.getCreatedAt().toISOString(),
+            updatedAt: survey.getUpdatedAt().toISOString(),
+            userId: user.getId(),
+            responseCount
+          };
+        } catch (error) {
+          console.warn(`Failed to get response count for survey ${survey.getId()}:`, error);
+          // Return survey without response count if there's an error
+          return {
+            id: survey.getId(),
+            title: survey.getTitle(),
+            description: survey.getDescription(),
+            questionCount: survey.getQuestionCount(),
+            isActive: survey.getIsActive(),
+            createdAt: survey.getCreatedAt().toISOString(),
+            updatedAt: survey.getUpdatedAt().toISOString(),
+            userId: user.getId(),
+            responseCount: 0
+          };
+        }
+      })
+    );
 
     return NextResponse.json({
-      surveys,
+      surveys: surveysWithCounts,
       pagination: {
         offset,
         limit,

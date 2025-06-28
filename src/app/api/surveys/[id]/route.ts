@@ -5,9 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { FirebaseSurveyRepository } from '../../../../infrastructure/repositories/FirebaseSurveyRepository';
+import { AdminFirebaseSurveyRepository } from '../../../../infrastructure/repositories/AdminFirebaseSurveyRepository';
 import { SurveyId } from '../../../../domain/survey/value-objects/SurveyId';
 
-const surveyRepository = new FirebaseSurveyRepository();
+const surveyRepository = new AdminFirebaseSurveyRepository();
 
 export async function GET(
   request: NextRequest,
@@ -27,19 +28,19 @@ export async function GET(
 
     // Convert to API response format
     const surveyData = {
-      id: survey.getId().getValue(),
+      id: survey.getId(),
       title: survey.getTitle(),
       description: survey.getDescription(),
-      createdBy: survey.getCreatedBy(),
       createdAt: survey.getCreatedAt(),
       updatedAt: survey.getUpdatedAt(),
-      isPublished: survey.isPublished(),
+      isPublished: survey.canBePublished(),
+      isActive: survey.getIsActive(),
       questions: survey.getQuestions().map(question => ({
-        id: question.getId().getValue(),
+        id: question.getId(),
         text: question.getText(),
         type: question.getType().getValue(),
         options: question.getOptions(),
-        isRequired: question.isRequired(),
+        isRequired: question.getIsRequired(),
         order: question.getOrder()
       }))
     };

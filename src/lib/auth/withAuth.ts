@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { User } from '../../domain/user/entities/User';
 import {AuthService} from "@/application/services/AuthService";
 import {FirebaseAuthService} from "@/infrastructure/auth/FirebaseAuthService";
+import { verifyIdToken } from '../firebase-admin';
 
 // Extend NextRequest to include user property
 declare module 'next/server' {
@@ -12,7 +13,7 @@ declare module 'next/server' {
 
 /**
  * Authentication middleware for API routes
- * Verifies JWT token and sets user context
+ * Verifies Firebase ID token using Firebase Admin SDK
  */
 export function withAuth<T = any>(
   handler: (req: NextRequest, context: T) => Promise<NextResponse> | NextResponse
@@ -43,20 +44,15 @@ export function withAuth<T = any>(
         );
       }
 
-      // For testing purposes, decode the JWT token payload
+      // Verify Firebase ID token using Admin SDK
       try {
-        // Basic JWT decode (not secure for production)
-        const parts = token.split('.');
-        if (parts.length !== 3) {
-          throw new Error('Invalid JWT format');
-        }
+        console.log('🔐 Verifying Firebase ID token with Admin SDK');
+        const decodedToken = await verifyIdToken(token);
         
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-        
-        // Firebase ID tokens have different field names
-        const userId = payload.sub || payload.user_id;
-        const email = payload.email;
-        const name = payload.name || payload.display_name || 'User';
+        // Extract user information from verified token
+        const userId = decodedToken.uid;
+        const email = decodedToken.email || 'unknown@example.com';
+        const name = decodedToken.name || decodedToken.display_name || 'User';
         
         if (!userId) {
           return NextResponse.json(
@@ -68,32 +64,53 @@ export function withAuth<T = any>(
           );
         }
 
-        // Create user from token payload
-        const user = User.createRegistered(
-          userId,
-          email || 'unknown@example.com',
-          name
-        );
+        // Create user from verified token payload
+        const user = User.createRegistered(userId, email, name);
 
         // Add user to request context
         req.user = user;
 
+        console.log(`✅ User authenticated: ${email} (${userId})`);
+
         // Call the actual handler
         return await handler(req, context);
         
-      } catch (verificationError) {
-        console.error('Token verification failed:', verificationError);
+      } catch (verificationError: any) {
+        console.error('🚨 Firebase token verification failed:', verificationError.message);
+        
+        // Handle specific Firebase Auth errors
+        let errorMessage = 'Token verification failed';
+        if (verificationError.code) {
+          switch (verificationError.code) {
+            case 'auth/id-token-expired':
+              errorMessage = 'Token has expired. Please log in again.';
+              break;
+            case 'auth/id-token-revoked':
+              errorMessage = 'Token has been revoked. Please log in again.';
+              break;
+            case 'auth/invalid-id-token':
+              errorMessage = 'Invalid token format or signature.';
+              break;
+            case 'auth/project-not-found':
+              errorMessage = 'Firebase project configuration error.';
+              break;
+            default:
+              errorMessage = 'Authentication failed. Please log in again.';
+          }
+        }
+        
         return NextResponse.json(
           { 
             error: 'Unauthorized', 
-            message: 'Token verification failed' 
+            message: errorMessage,
+            code: verificationError.code || 'AUTH_ERROR'
           },
           { status: 401 }
         );
       }
       
     } catch (error) {
-      console.error('Authentication middleware error:', error);
+      console.error('🚨 Authentication middleware error:', error);
       return NextResponse.json(
         { 
           error: 'Internal Server Error', 
@@ -120,16 +137,22 @@ export function withOptionalAuth<T = any>(
         const token = authHeader.substring(7);
         
         if (token) {
-          const authService: AuthService = new FirebaseAuthService();
-          
           try {
-            const user = await authService.getCurrentUser();
-            if (user) {
+            console.log('🔐 Optional auth: Verifying Firebase ID token');
+            const decodedToken = await verifyIdToken(token);
+            
+            const userId = decodedToken.uid;
+            const email = decodedToken.email || 'unknown@example.com';
+            const name = decodedToken.name || decodedToken.display_name || 'User';
+            
+            if (userId) {
+              const user = User.createRegistered(userId, email, name);
               req.user = user;
+              console.log(`✅ Optional auth successful: ${email} (${userId})`);
             }
           } catch (error) {
             // Ignore authentication errors for optional auth
-            console.warn('Optional auth failed:', error);
+            console.warn('⚠️ Optional auth failed, continuing without user:', error);
           }
         }
       }
@@ -137,7 +160,7 @@ export function withOptionalAuth<T = any>(
       return await handler(req, context);
       
     } catch (error) {
-      console.error('Optional authentication middleware error:', error);
+      console.error('🚨 Optional authentication middleware error:', error);
       return await handler(req, context);
     }
   };

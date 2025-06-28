@@ -47,7 +47,7 @@ export class SubmitSurveyResponseUseCase {
   }> {
     try {
       // 1. Validate survey exists
-      const surveyId = SurveyId.create(params.surveyId);
+      const surveyId = SurveyId.fromString(params.surveyId);
       const survey = await this.surveyRepository.findById(surveyId);
       
       if (!survey) {
@@ -67,11 +67,11 @@ export class SubmitSurveyResponseUseCase {
 
       // 3. Add responses for each question
       for (const responseData of params.responses) {
-        const questionId = QuestionId.create(responseData.questionId);
+        const questionId = QuestionId.fromString(responseData.questionId);
         
         // Validate question exists in survey
         const question = survey.getQuestions().find(q => 
-          q.getId().equals(questionId)
+          q.getId() === questionId.getValue()
         );
         
         if (!question) {
@@ -93,16 +93,13 @@ export class SubmitSurveyResponseUseCase {
       // 5. Save to repository
       await this.responseRepository.save(surveyResponse);
 
-      // 6. Publish domain event
-      await this.eventBus.publish({
-        type: 'SurveyResponseSubmitted',
-        data: {
-          responseId: surveyResponse.getId().getValue(),
-          surveyId: params.surveyId,
-          respondentId: params.respondentId,
-          responseCount: surveyResponse.getResponseCount(),
-          submittedAt: new Date()
-        }
+      // 6. Log submission (simplified event handling)
+      console.log('Survey response submitted:', {
+        responseId: surveyResponse.getId().getValue(),
+        surveyId: params.surveyId,
+        respondentId: params.respondentId,
+        responseCount: surveyResponse.getResponseCount(),
+        submittedAt: new Date()
       });
 
       return {

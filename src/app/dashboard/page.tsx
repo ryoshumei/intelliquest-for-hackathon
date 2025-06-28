@@ -23,6 +23,24 @@ interface Survey {
   responseCount?: number;
 }
 
+interface SurveyResponse {
+  id: string;
+  surveyId: string;
+  respondentId?: string;
+  respondentEmail?: string;
+  responses: {
+    questionId: string;
+    questionText: string;
+    questionType: string;
+    answer: string | string[] | number;
+    answeredAt: string;
+  }[];
+  startedAt: string;
+  submittedAt?: string;
+  isComplete: boolean;
+  responseCount: number;
+}
+
 export default function DashboardPage() {
   return (
     <AuthGuard>
@@ -42,6 +60,10 @@ function DashboardContent() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [selectedSurveyResponses, setSelectedSurveyResponses] = useState<SurveyResponse[]>([]);
+  const [selectedSurveyTitle, setSelectedSurveyTitle] = useState<string>('');
+  const [showResponsesModal, setShowResponsesModal] = useState(false);
+  const [loadingResponses, setLoadingResponses] = useState(false);
 
   // Fetch real data from API
   useEffect(() => {
@@ -77,6 +99,11 @@ function DashboardContent() {
             totalResponses,
             recentActivity,
           });
+        } else if (response.status === 401) {
+          // Token expired or invalid, redirect to login
+          console.warn('🚨 Authentication failed, redirecting to login');
+          window.location.href = '/auth/login';
+          return;
         } else {
           console.error('Failed to fetch surveys:', response.status);
         }
@@ -123,6 +150,50 @@ function DashboardContent() {
         setCopySuccess(null);
       }, 2000);
     }
+  };
+
+  const viewSurveyResponses = async (surveyId: string, surveyTitle: string) => {
+    setLoadingResponses(true);
+    setSelectedSurveyTitle(surveyTitle);
+    setShowResponsesModal(true);
+
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/responses`);
+      
+      if (response.status === 401) {
+        // Token expired or invalid, redirect to login
+        console.warn('🚨 Authentication failed, redirecting to login');
+        window.location.href = '/auth/login';
+        return;
+      }
+      
+      const data = await response.json();
+
+      if (data.success) {
+        setSelectedSurveyResponses(data.responses || []);
+      } else {
+        console.error('Failed to fetch responses:', data.message);
+        setSelectedSurveyResponses([]);
+      }
+    } catch (error) {
+      console.error('Error fetching survey responses:', error);
+      setSelectedSurveyResponses([]);
+    } finally {
+      setLoadingResponses(false);
+    }
+  };
+
+  const closeResponsesModal = () => {
+    setShowResponsesModal(false);
+    setSelectedSurveyResponses([]);
+    setSelectedSurveyTitle('');
+  };
+
+  const formatAnswer = (answer: string | string[] | number) => {
+    if (Array.isArray(answer)) {
+      return answer.join(', ');
+    }
+    return String(answer);
   };
 
   if (!user) {
@@ -400,6 +471,18 @@ function DashboardContent() {
                           }`}>
                             {survey.isActive ? 'Active' : 'Draft'}
                           </span>
+                          {(survey.responseCount || 0) > 0 && (
+                            <button
+                              onClick={() => viewSurveyResponses(survey.id, survey.title)}
+                              className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-blue-700 bg-blue-50 shadow-sm text-xs font-medium rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              title="View responses"
+                            >
+                              <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              View Responses
+                            </button>
+                          )}
                           {survey.isActive && (
                             <button
                               onClick={() => copyShareLink(survey.id)}
@@ -457,6 +540,94 @@ function DashboardContent() {
             </div>
           </div>
         </div>
+
+        {/* Survey Responses Modal */}
+        {showResponsesModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Survey Responses: {selectedSurveyTitle}
+                  </h3>
+                  <button
+                    onClick={closeResponsesModal}
+                    className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="max-h-96 overflow-y-auto">
+                  {loadingResponses ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                      <p className="mt-2 text-sm text-gray-500">Loading responses...</p>
+                    </div>
+                  ) : selectedSurveyResponses.length > 0 ? (
+                    <div className="space-y-6">
+                      {selectedSurveyResponses.map((response, responseIndex) => (
+                        <div key={response.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-medium text-gray-900">
+                              Response #{responseIndex + 1}
+                            </h4>
+                            <div className="text-xs text-gray-500">
+                              Submitted: {response.submittedAt ? new Date(response.submittedAt).toLocaleString() : 'In progress'}
+                              {response.respondentEmail && (
+                                <span className="ml-2">by {response.respondentEmail}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {response.responses.map((answer, answerIndex) => (
+                              <div key={answerIndex} className="bg-white p-3 rounded border">
+                                <div className="text-sm font-medium text-gray-900 mb-1">
+                                  {answer.questionText}
+                                </div>
+                                <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                                  <span className="font-medium">Answer:</span> {formatAnswer(answer.answer)}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Type: {answer.questionType} • Answered: {new Date(answer.answeredAt).toLocaleString()}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No responses yet</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        This survey hasn't received any responses yet.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex justify-end pt-4 border-t border-gray-200 mt-4">
+                  <button
+                    onClick={closeResponsesModal}
+                    className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
