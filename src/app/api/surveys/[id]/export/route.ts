@@ -84,6 +84,12 @@ export const GET = withAuth(async (
       });
     }
 
+    // This should never be reached due to format validation above, but ensures type safety
+    return NextResponse.json(
+      { error: 'Unsupported format' },
+      { status: 400 }
+    );
+
   } catch (error) {
     console.error('❌ Error exporting survey data:', error);
     return NextResponse.json(
