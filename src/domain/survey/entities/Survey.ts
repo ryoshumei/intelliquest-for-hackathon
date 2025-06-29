@@ -11,6 +11,13 @@ import { SurveyCreatedEvent } from '../events/SurveyCreatedEvent';
 export class Survey {
   private readonly domainEvents: DomainEvent[] = [];
 
+  // Phase 3: New properties
+  private goal: string = '';
+  private dynamicQuestions: Question[] = [];
+  private maxQuestions: number = 10;
+  private targetLanguage: string = 'en';
+  private autoTranslate: boolean = false;
+
   private constructor(
     private readonly id: SurveyId,
     private title: string,
@@ -43,17 +50,23 @@ export class Survey {
 
   /**
    * Factory method to recreate survey from persistence
+   * Phase 3: Enhanced with new fields
    */
   static fromPersistence(
     id: string,
     title: string,
     description: string,
+    goal: string,
     questions: Question[],
+    dynamicQuestions: Question[],
+    maxQuestions: number,
+    targetLanguage: string,
+    autoTranslate: boolean,
     isActive: boolean,
     createdAt: Date,
     updatedAt: Date
   ): Survey {
-    return new Survey(
+    const survey = new Survey(
       SurveyId.fromString(id),
       title,
       description,
@@ -62,6 +75,15 @@ export class Survey {
       createdAt,
       updatedAt
     );
+    
+    // Set Phase 3 properties
+    survey.goal = goal;
+    survey.dynamicQuestions = dynamicQuestions;
+    survey.maxQuestions = maxQuestions;
+    survey.targetLanguage = targetLanguage;
+    survey.autoTranslate = autoTranslate;
+    
+    return survey;
   }
 
   /**
@@ -137,6 +159,14 @@ export class Survey {
     return this.questions.length > 0 && this.isActive;
   }
 
+  /**
+   * Business Rule: Survey can generate dynamic questions if it has a goal and hasn't reached max questions
+   * Phase 3: Dynamic question generation validation
+   */
+  canGenerateDynamicQuestions(): boolean {
+    return this.goal.trim().length > 0 && this.getTotalQuestionCount() < this.maxQuestions;
+  }
+
   // Getters
   getId(): string {
     return this.id.getValue();
@@ -158,6 +188,11 @@ export class Survey {
     return this.questions.length;
   }
 
+  // Phase 3: Get total question count including dynamic questions
+  getTotalQuestionCount(): number {
+    return this.questions.length + this.dynamicQuestions.length;
+  }
+
   getIsActive(): boolean {
     return this.isActive;
   }
@@ -168,6 +203,61 @@ export class Survey {
 
   getUpdatedAt(): Date {
     return this.updatedAt;
+  }
+
+  // Phase 3: New getters
+  getGoal(): string {
+    return this.goal;
+  }
+
+  getDynamicQuestions(): Question[] {
+    return [...this.dynamicQuestions];
+  }
+
+  getMaxQuestions(): number {
+    return this.maxQuestions;
+  }
+
+  getTargetLanguage(): string {
+    return this.targetLanguage;
+  }
+
+  getAutoTranslate(): boolean {
+    return this.autoTranslate;
+  }
+
+  // Phase 3: Setters for configuration
+  setGoal(goal: string): void {
+    this.goal = goal.trim();
+    this.updateTimestamp();
+  }
+
+  setMaxQuestions(maxQuestions: number): void {
+    if (maxQuestions < 5 || maxQuestions > 50) {
+      throw new DomainError('Max questions must be between 5 and 50');
+    }
+    this.maxQuestions = maxQuestions;
+    this.updateTimestamp();
+  }
+
+  setTargetLanguage(targetLanguage: string): void {
+    this.targetLanguage = targetLanguage;
+    this.updateTimestamp();
+  }
+
+  setAutoTranslate(autoTranslate: boolean): void {
+    this.autoTranslate = autoTranslate;
+    this.updateTimestamp();
+  }
+
+  addDynamicQuestion(question: Question): void {
+    this.dynamicQuestions.push(question);
+    this.updateTimestamp();
+  }
+
+  clearDynamicQuestions(): void {
+    this.dynamicQuestions = [];
+    this.updateTimestamp();
   }
 
   // Domain Events
@@ -190,13 +280,19 @@ export class Survey {
 
   /**
    * Convert to plain object for persistence
+   * Phase 3: Enhanced with new fields
    */
   toPlainObject() {
     return {
       id: this.getId(),
       title: this.title,
       description: this.description,
+      goal: this.goal,
       questions: this.questions.map(q => q.toPlainObject()),
+      dynamicQuestions: this.dynamicQuestions.map(q => q.toPlainObject()),
+      maxQuestions: this.maxQuestions,
+      targetLanguage: this.targetLanguage,
+      autoTranslate: this.autoTranslate,
       isActive: this.isActive,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt

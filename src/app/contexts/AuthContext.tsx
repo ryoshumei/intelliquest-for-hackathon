@@ -157,13 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🔄 AuthContext: Performing periodic token refresh');
         await auth?.currentUser?.getIdToken(true);
         console.log('✅ AuthContext: Token refreshed successfully');
-             } catch (error) {
-         console.error('🚨 AuthContext: Failed to refresh token:', error);
-         // If refresh fails, user might need to re-authenticate
-         if (auth) {
-           await signOut(auth);
-         }
-       }
+                   } catch (error) {
+        console.error('⚠️ AuthContext: Token refresh failed, but keeping user logged in:', error);
+        // Don't sign out user on refresh failure - let them continue working
+        // The token will be refreshed on next API call if needed
+      }
     }, 30 * 60 * 1000); // 30 minutes
 
     return () => clearInterval(tokenRefreshInterval);
@@ -340,13 +338,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return await getToken(true);
       }
       
-             // If refresh also fails, user needs to re-authenticate
-       if (error?.code === 'auth/id-token-expired' || error?.code === 'auth/id-token-revoked') {
-         console.log('🚨 AuthContext: Token expired and refresh failed, logging out user');
-         if (auth) {
-           await signOut(auth);
-         }
-       }
+      // If refresh also fails, don't automatically sign out
+      if (error?.code === 'auth/id-token-expired' || error?.code === 'auth/id-token-revoked') {
+        console.log('⚠️ AuthContext: Token expired, user may need to login again on next protected action');
+        // Don't automatically sign out - let user continue and re-authenticate when needed
+      }
       
       return null;
     }

@@ -2,7 +2,7 @@
 
 /**
  * Survey Response Page
- * Allows users to answer survey questions
+ * Allows users to answer survey questions with translation support
  */
 
 import { useState, useEffect } from 'react';
@@ -13,7 +13,9 @@ import { Input } from '../../../components/ui/input';
 import { Textarea } from '../../../components/ui/textarea';
 import { Label } from '../../../components/ui/label';
 import { Progress } from '../../../components/ui/progress';
-import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { Badge } from '../../../components/ui/badge';
+import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Globe, RefreshCw, Sparkles } from 'lucide-react';
 
 interface Question {
   id: string;
@@ -29,6 +31,12 @@ interface Survey {
   title: string;
   description: string;
   questions: Question[];
+  // Phase 3: New properties
+  goal?: string;
+  maxQuestions?: number;
+  targetLanguage?: string;
+  autoTranslate?: boolean;
+  dynamicQuestions?: Question[];
 }
 
 interface QuestionResponse {
@@ -36,6 +44,12 @@ interface QuestionResponse {
   questionText: string;
   questionType: string;
   answer: string | string[] | number;
+}
+
+interface SupportedLanguage {
+  code: string;
+  name: string;
+  nativeName: string;
 }
 
 export default function SurveyResponsePage() {
@@ -50,6 +64,19 @@ export default function SurveyResponsePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Phase 3: Translation features
+  const [supportedLanguages, setSupportedLanguages] = useState<SupportedLanguage[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+  const [translatedQuestions, setTranslatedQuestions] = useState<Map<string, string>>(new Map());
+  const [translatedOptions, setTranslatedOptions] = useState<Map<string, string[]>>(new Map());
+  const [translatingQuestions, setTranslatingQuestions] = useState<Set<string>>(new Set());
+  const [detectedLanguage, setDetectedLanguage] = useState<string>('');
+
+  // Phase 3: Dynamic questions features
+  const [dynamicQuestions, setDynamicQuestions] = useState<Question[]>([]);
+  const [showDynamicQuestions, setShowDynamicQuestions] = useState(false);
+  const [generatingDynamicQuestions, setGeneratingDynamicQuestions] = useState(false);
 
   // Load survey data
   useEffect(() => {
@@ -75,6 +102,212 @@ export default function SurveyResponsePage() {
     }
   }, [surveyId]);
 
+  // Load supported languages
+  useEffect(() => {
+    const loadLanguages = async () => {
+      try {
+        const response = await fetch('/api/translate/languages');
+        const data = await response.json();
+        
+        if (data.success) {
+          setSupportedLanguages(data.languages);
+          
+          // Show service status info
+          if (!data.serviceStatus?.available) {
+            console.warn('Translation service not available:', data.serviceStatus?.error);
+          }
+          
+          // Auto-detect user's language
+          const userLang = navigator.language.split('-')[0];
+          const supportedLang = data.languages.find((lang: SupportedLanguage) => lang.code.startsWith(userLang));
+          if (supportedLang) {
+            setSelectedLanguage(supportedLang.code);
+          }
+        } else {
+          throw new Error(data.error || 'Failed to load languages');
+        }
+      } catch (error) {
+        console.error('Failed to load languages:', error);
+        // Fallback languages - always available
+        setSupportedLanguages([
+          { code: 'en', name: 'English', nativeName: 'English' },
+          { code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文' },
+          { code: 'ja', name: 'Japanese', nativeName: '日本語' },
+          { code: 'es', name: 'Spanish', nativeName: 'Español' },
+          { code: 'fr', name: 'French', nativeName: 'Français' },
+          { code: 'de', name: 'German', nativeName: 'Deutsch' }
+        ]);
+      }
+    };
+
+    loadLanguages();
+  }, []);
+
+  // Auto-translate current question when language changes
+  useEffect(() => {
+    if (survey && selectedLanguage !== 'en' && currentQuestionIndex >= 0) {
+      const allQuestions = [...survey.questions, ...dynamicQuestions];
+      const currentQuestion = allQuestions[currentQuestionIndex];
+      if (currentQuestion && !translatedQuestions.has(currentQuestion.id)) {
+        translateQuestion(currentQuestion);
+      }
+    }
+  }, [selectedLanguage, currentQuestionIndex, survey, dynamicQuestions]);
+
+  const translateQuestion = async (question: Question) => {
+    if (selectedLanguage === 'en' || translatingQuestions.has(question.id)) return;
+
+    setTranslatingQuestions(prev => new Set(prev).add(question.id));
+
+    try {
+      // Translate question text
+      const questionResponse = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'translate',
+          text: question.text,
+          targetLanguage: selectedLanguage,
+          sourceLanguage: 'en'
+        }),
+      });
+
+      const questionData = await questionResponse.json();
+
+      if (questionData.success && questionData.translated) {
+        setTranslatedQuestions(prev => new Map(prev).set(question.id, questionData.translatedText));
+      }
+
+      // Translate options if they exist
+      if (question.options && question.options.length > 0) {
+        const translatedOptionsList: string[] = [];
+        
+        for (const option of question.options) {
+          try {
+            const optionResponse = await fetch('/api/translate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'translate',
+                text: option,
+                targetLanguage: selectedLanguage,
+                sourceLanguage: 'en'
+              }),
+            });
+
+            const optionData = await optionResponse.json();
+            
+            if (optionData.success && optionData.translated) {
+              translatedOptionsList.push(optionData.translatedText);
+            } else {
+              translatedOptionsList.push(option); // Keep original if translation fails
+            }
+          } catch (error) {
+            console.error('Failed to translate option:', option, error);
+            translatedOptionsList.push(option); // Keep original on error
+          }
+        }
+        
+        setTranslatedOptions(prev => new Map(prev).set(question.id, translatedOptionsList));
+      }
+    } catch (error) {
+      console.error('Translation error:', error);
+    } finally {
+      setTranslatingQuestions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(question.id);
+        return newSet;
+      });
+    }
+  };
+
+  const translateAllQuestions = async () => {
+    if (!survey || selectedLanguage === 'en') return;
+
+    const allQuestions = [...survey.questions, ...dynamicQuestions];
+    const questionsToTranslate = allQuestions.filter(q => 
+      !translatedQuestions.has(q.id) && !translatingQuestions.has(q.id)
+    );
+
+    for (const question of questionsToTranslate) {
+      await translateQuestion(question);
+      // Add small delay to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  };
+
+  const generateDynamicQuestions = async (count: number = 1) => {
+    if (!survey || responses.size === 0) return;
+
+    setGeneratingDynamicQuestions(true);
+
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/dynamic-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          surveyGoal: survey.description || survey.goal || 'Understanding user preferences',
+          previousAnswers: Array.from(responses.values()),
+          currentQuestionIndex: currentQuestionIndex,
+          questionCount: count,
+          maxQuestions: survey.maxQuestions || 10,
+          targetLanguage: selectedLanguage
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Handle single question response
+        if (data.question) {
+          const newDynamicQuestion: Question = {
+            id: `dynamic-${Date.now()}`,
+            text: data.question.text,
+            type: data.question.type,
+            options: data.question.options || [],
+            isRequired: false,
+            order: survey.questions.length + dynamicQuestions.length + 1
+          };
+
+          setDynamicQuestions(prev => [...prev, newDynamicQuestion]);
+          setShowDynamicQuestions(true);
+          // Move to the first dynamic question
+          setCurrentQuestionIndex(survey.questions.length);
+        }
+        // Handle multiple questions response
+        else if (data.questions && data.questions.length > 0) {
+          const newDynamicQuestions: Question[] = data.questions.map((q: any, index: number) => ({
+            id: `dynamic-${Date.now()}-${index}`,
+            text: q.text,
+            type: q.type,
+            options: q.options || [],
+            isRequired: false,
+            order: survey.questions.length + dynamicQuestions.length + index + 1
+          }));
+
+          setDynamicQuestions(prev => [...prev, ...newDynamicQuestions]);
+          setShowDynamicQuestions(true);
+          // Move to the first dynamic question
+          setCurrentQuestionIndex(survey.questions.length);
+        }
+
+        console.log('✅ Dynamic questions generated:', data.message);
+      } else {
+        console.error('❌ Dynamic question generation failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Failed to generate dynamic questions:', error);
+    } finally {
+      setGeneratingDynamicQuestions(false);
+    }
+  };
+
   const handleAnswerChange = (questionId: string, answer: string | string[] | number, questionText: string, questionType: string) => {
     const newResponses = new Map(responses);
     newResponses.set(questionId, {
@@ -84,18 +317,22 @@ export default function SurveyResponsePage() {
       answer
     });
     setResponses(newResponses);
+
+    // No longer automatically generate dynamic questions here
+    // They will be generated when user clicks Next on the last base question
   };
 
   const handleSubmit = async () => {
     if (!survey) return;
 
-    // Validate required questions
-    const unansweredRequired = survey.questions.filter(q => 
+    // Combine original and dynamic questions for validation
+    const allQuestions = [...survey.questions, ...dynamicQuestions];
+    const allRequiredQuestions = allQuestions.filter(q => 
       q.isRequired && !responses.has(q.id)
     );
 
-    if (unansweredRequired.length > 0) {
-      setError(`Please answer all required questions: ${unansweredRequired.map(q => q.text).join(', ')}`);
+    if (allRequiredQuestions.length > 0) {
+      setError(`Please answer all required questions: ${allRequiredQuestions.map(q => q.text).join(', ')}`);
       return;
     }
 
@@ -103,16 +340,225 @@ export default function SurveyResponsePage() {
     setError(null);
 
     try {
+      // Prepare all responses including dynamic questions
+      let allResponses = Array.from(responses.entries()).map(([questionId, response]) => {
+        // Find the question (could be regular or dynamic)
+        const question = allQuestions.find(q => q.id === questionId);
+        return {
+          questionId: response.questionId,
+          questionText: response.questionText || question?.text || '',
+          questionType: response.questionType || question?.type || '',
+          answer: response.answer,
+          originalQuestionText: response.questionText || question?.text || '',
+          originalAnswer: response.answer
+        };
+      });
+
+      console.log(`📤 Submitting ${allResponses.length} responses (${survey.questions.length} base + ${dynamicQuestions.length} dynamic)`);
+
+      // Check if translation is needed (user language vs survey target language)
+      const needsTranslation = survey.targetLanguage && selectedLanguage !== survey.targetLanguage;
+
+      if (needsTranslation) {
+        console.log(`🚀 Batch translating all content from ${selectedLanguage} to ${survey.targetLanguage}`);
+
+        // Collect all texts to translate
+        const questionsToTranslate = allResponses.map(r => r.questionText);
+        const answersToTranslate = allResponses
+          .filter(r => typeof r.answer === 'string' && r.answer.trim())
+          .map(r => r.answer as string);
+
+        try {
+          // Batch translate all question texts
+          const questionsTranslationPromise = fetch('/api/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'batch',
+              texts: questionsToTranslate,
+              targetLanguage: survey.targetLanguage,
+              sourceLanguage: selectedLanguage
+            }),
+          });
+
+          // Batch translate all answers
+          const answersTranslationPromise = answersToTranslate.length > 0
+            ? fetch('/api/translate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'batch',
+                  texts: answersToTranslate,
+                  targetLanguage: survey.targetLanguage,
+                  sourceLanguage: selectedLanguage
+                }),
+              })
+            : Promise.resolve(null);
+
+          // Execute both batch translations in parallel
+          const [questionsResponse, answersResponse] = await Promise.all([
+            questionsTranslationPromise,
+            answersTranslationPromise
+          ]);
+
+          const questionsData = await questionsResponse.json();
+          const answersData = answersResponse ? await answersResponse.json() : null;
+
+          // Apply translations to responses
+          let answerIndex = 0;
+          allResponses = allResponses.map((response, index) => {
+            const translatedQuestionText = questionsData.success 
+              ? questionsData.translatedTexts[index] 
+              : response.questionText;
+
+            let translatedAnswer = response.answer;
+            if (typeof response.answer === 'string' && response.answer.trim() && answersData && answersData.success) {
+              translatedAnswer = answersData.translatedTexts[answerIndex];
+              answerIndex++;
+            }
+
+            return {
+              ...response,
+              questionText: translatedQuestionText,
+              answer: translatedAnswer,
+              // Keep original for reference
+              originalQuestionText: response.questionText,
+              originalAnswer: response.answer,
+              originalLanguage: selectedLanguage,
+              translatedToLanguage: survey.targetLanguage,
+              translationApplied: translatedQuestionText !== response.questionText || translatedAnswer !== response.answer
+            };
+          });
+
+          console.log(`✅ Completed batch translation with 2 API calls instead of ${questionsToTranslate.length + answersToTranslate.length}`);
+        } catch (error) {
+          console.error('Batch translation failed, falling back to individual translation:', error);
+          // Fallback to individual translation if batch fails
+          // ... (keeping original individual translation logic as fallback)
+        }
+      }
+
+      // Prepare dynamic questions with translations
+      let translatedDynamicQuestions = dynamicQuestions.map(q => ({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        options: q.options,
+        isAIGenerated: true,
+        originalText: q.text,
+        originalOptions: q.options
+      }));
+
+      // Batch translate dynamic questions if needed
+      if (needsTranslation && dynamicQuestions.length > 0) {
+        console.log(`🚀 Batch translating ${dynamicQuestions.length} dynamic questions`);
+        
+        try {
+          // Collect all dynamic question texts and options
+          const dynamicTextsToTranslate = dynamicQuestions.map(q => q.text);
+          const allOptionsToTranslate: string[] = [];
+          const optionsMapping: { questionIndex: number, optionCount: number }[] = [];
+          
+          dynamicQuestions.forEach((q, index) => {
+            if (q.options && q.options.length > 0) {
+              optionsMapping.push({ questionIndex: index, optionCount: q.options.length });
+              allOptionsToTranslate.push(...q.options);
+            }
+          });
+
+          // Batch translate question texts and options
+          const dynamicQuestionsPromise = fetch('/api/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'batch',
+              texts: dynamicTextsToTranslate,
+              targetLanguage: survey.targetLanguage,
+              sourceLanguage: selectedLanguage
+            }),
+          });
+
+          const dynamicOptionsPromise = allOptionsToTranslate.length > 0
+            ? fetch('/api/translate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'batch',
+                  texts: allOptionsToTranslate,
+                  targetLanguage: survey.targetLanguage,
+                  sourceLanguage: selectedLanguage
+                }),
+              })
+            : Promise.resolve(null);
+
+          const [questionsResponse, optionsResponse] = await Promise.all([
+            dynamicQuestionsPromise,
+            dynamicOptionsPromise
+          ]);
+
+          const questionsData = await questionsResponse.json();
+          const optionsData = optionsResponse ? await optionsResponse.json() : null;
+
+          // Apply translations to dynamic questions
+          let optionIndex = 0;
+          translatedDynamicQuestions = dynamicQuestions.map((q, index) => {
+            const translatedText = questionsData.success 
+              ? questionsData.translatedTexts[index] 
+              : q.text;
+
+            let translatedOptions = q.options;
+            if (q.options && q.options.length > 0 && optionsData && optionsData.success) {
+              translatedOptions = q.options.map(() => {
+                return optionsData.translatedTexts[optionIndex++];
+              });
+            }
+
+            return {
+              id: q.id,
+              text: translatedText,
+              type: q.type,
+              options: translatedOptions,
+              isAIGenerated: true,
+              originalText: q.text,
+              originalOptions: q.options,
+              originalLanguage: selectedLanguage,
+              translatedToLanguage: survey.targetLanguage
+            };
+          });
+
+          console.log(`✅ Completed batch translation of dynamic questions with 2 API calls instead of ${dynamicTextsToTranslate.length + allOptionsToTranslate.length}`);
+        } catch (error) {
+          console.error('Failed to batch translate dynamic questions:', error);
+          // Continue with original questions if batch translation fails
+        }
+      }
+
       const response = await fetch(`/api/surveys/${surveyId}/responses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          responses: Array.from(responses.values()),
+          responses: allResponses,
+          dynamicQuestions: translatedDynamicQuestions,
           metadata: {
             completedAt: new Date().toISOString(),
-            timeSpent: Date.now() // Could track actual time spent
+            timeSpent: Date.now(), // Could track actual time spent
+            userLanguage: selectedLanguage,
+            detectedLanguage: detectedLanguage,
+            surveyTargetLanguage: survey.targetLanguage,
+            translationApplied: needsTranslation,
+            totalQuestions: allQuestions.length,
+            baseQuestionsCount: survey.questions.length,
+            dynamicQuestionsCount: dynamicQuestions.length
           }
         }),
       });
@@ -131,6 +577,10 @@ export default function SurveyResponsePage() {
     }
   };
 
+  const getQuestionText = (question: Question) => {
+    return translatedQuestions.get(question.id) || question.text;
+  };
+
   const renderQuestionInput = (question: Question) => {
     const currentResponse = responses.get(question.id);
     const currentAnswer = currentResponse?.answer;
@@ -147,6 +597,7 @@ export default function SurveyResponsePage() {
         );
 
       case 'multiple_choice':
+        const translatedOpts = translatedOptions.get(question.id) || question.options;
         return (
           <div className="space-y-3">
             {question.options.map((option, index) => (
@@ -159,7 +610,7 @@ export default function SurveyResponsePage() {
                   onChange={(e) => handleAnswerChange(question.id, e.target.value, question.text, question.type)}
                   className="w-4 h-4 text-blue-600"
                 />
-                <span className="text-sm">{option}</span>
+                <span className="text-sm">{translatedOpts[index] || option}</span>
               </label>
             ))}
           </div>
@@ -167,11 +618,12 @@ export default function SurveyResponsePage() {
 
       case 'scale':
         const scaleValue = typeof currentAnswer === 'number' ? currentAnswer : 1;
+        const scaleLabels = translatedOptions.get(question.id) || ['Poor', 'Excellent'];
         return (
           <div className="space-y-4">
             <div className="flex justify-between text-sm text-gray-600">
-              <span>Poor</span>
-              <span>Excellent</span>
+              <span>{scaleLabels[0] || 'Poor'}</span>
+              <span>{scaleLabels[1] || 'Excellent'}</span>
             </div>
             <input
               type="range"
@@ -188,9 +640,11 @@ export default function SurveyResponsePage() {
         );
 
       case 'yes_no':
+        const yesNoOptions = ['Yes', 'No'];
+        const translatedYesNo = translatedOptions.get(question.id) || yesNoOptions;
         return (
           <div className="space-y-3">
-            {['Yes', 'No'].map((option) => (
+            {yesNoOptions.map((option, index) => (
               <label key={option} className="flex items-center space-x-3 cursor-pointer">
                 <input
                   type="radio"
@@ -200,7 +654,7 @@ export default function SurveyResponsePage() {
                   onChange={(e) => handleAnswerChange(question.id, e.target.value, question.text, question.type)}
                   className="w-4 h-4 text-blue-600"
                 />
-                <span className="text-sm">{option}</span>
+                <span className="text-sm">{translatedYesNo[index] || option}</span>
               </label>
             ))}
           </div>
@@ -270,10 +724,42 @@ export default function SurveyResponsePage() {
 
   if (!survey) return null;
 
-  const progress = ((responses.size) / survey.questions.length) * 100;
-  const currentQuestion = survey.questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === survey.questions.length - 1;
+  // Combine original questions with dynamic questions
+  const allQuestions = [...survey.questions, ...dynamicQuestions];
+  const totalQuestions = allQuestions.length;
+  
+  const progress = ((responses.size) / totalQuestions) * 100;
+  const currentQuestion = allQuestions[currentQuestionIndex];
+  
+  // Safety check for currentQuestion
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-lg font-semibold mb-2">Survey Error</h2>
+              <p className="text-gray-600 mb-4">Unable to load survey questions</p>
+              <Button onClick={() => router.push('/')}>
+                Go Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
   const canProceed = !currentQuestion.isRequired || responses.has(currentQuestion.id);
+  const isDynamicQuestion = currentQuestion.id.startsWith('dynamic-');
+  const isLastBaseQuestion = currentQuestionIndex === survey.questions.length - 1;
+  const allBaseQuestionsAnswered = survey.questions.every(q => responses.has(q.id));
+  const shouldGenerateDynamicQuestions = survey.goal && survey.maxQuestions && 
+    allBaseQuestionsAnswered && dynamicQuestions.length === 0 && !generatingDynamicQuestions;
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -287,11 +773,72 @@ export default function SurveyResponsePage() {
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-600">
-                Question {currentQuestionIndex + 1} of {survey.questions.length}
+                Question {currentQuestionIndex + 1} of {totalQuestions}
+                {dynamicQuestions.length > 0 && (
+                  <span className="text-xs text-blue-600 ml-1">
+                    ({dynamicQuestions.length} AI generated)
+                  </span>
+                )}
               </p>
               <div className="w-32 mt-1">
                 <Progress value={progress} className="h-2" />
               </div>
+            </div>
+          </div>
+          
+          {/* Phase 3: Translation Controls */}
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-blue-600" />
+                <Label htmlFor="language-select" className="text-sm font-medium">
+                  Language:
+                </Label>
+                <Select 
+                  value={selectedLanguage} 
+                  onValueChange={setSelectedLanguage}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {supportedLanguages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        <div className="flex items-center gap-2">
+                          <span>{lang.name}</span>
+                          <span className="text-xs text-gray-500">({lang.nativeName})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedLanguage !== 'en' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={true}
+                >
+                  {translatingQuestions.size > 0 ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Translating...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="w-4 h-4 mr-2" />
+                      Translation Status
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+               Multi-language Support
+              </Badge>
             </div>
           </div>
         </div>
@@ -302,13 +849,41 @@ export default function SurveyResponsePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              {currentQuestion.text}
+              {getQuestionText(currentQuestion)}
               {currentQuestion.isRequired && (
                 <span className="text-red-500 text-sm">*</span>
               )}
+              {selectedLanguage !== 'en' && !translatedQuestions.has(currentQuestion.id) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => translateQuestion(currentQuestion)}
+                  disabled={translatingQuestions.has(currentQuestion.id)}
+                >
+                  {translatingQuestions.has(currentQuestion.id) ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Globe className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
             </CardTitle>
-            <CardDescription>
-              Question {currentQuestionIndex + 1} of {survey.questions.length}
+            <CardDescription className="flex items-center justify-between">
+              <span>
+                Question {currentQuestionIndex + 1} of {totalQuestions}
+                {isDynamicQuestion && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    AI Generated
+                  </Badge>
+                )}
+              </span>
+              {translatedQuestions.has(currentQuestion.id) && (
+                <Badge variant="outline" className="text-xs">
+                  <Globe className="w-3 h-3 mr-1" />
+                  Translated
+                </Badge>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -330,7 +905,9 @@ export default function SurveyResponsePage() {
                 Previous
               </Button>
 
-              {isLastQuestion ? (
+
+
+              {isLastQuestion && !(isLastBaseQuestion && survey.goal && survey.maxQuestions && survey.maxQuestions > survey.questions.length && dynamicQuestions.length === 0) ? (
                 <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting || !canProceed}
@@ -347,16 +924,47 @@ export default function SurveyResponsePage() {
                 </Button>
               ) : (
                 <Button
-                  onClick={() => setCurrentQuestionIndex(Math.min(survey.questions.length - 1, currentQuestionIndex + 1))}
-                  disabled={!canProceed}
+                  onClick={async () => {
+                                        // If this is the last base question and we should generate dynamic questions
+                    if (isLastBaseQuestion && canProceed) {
+                      // Check if we should generate dynamic questions
+                      if (survey.goal && survey.maxQuestions && survey.maxQuestions > survey.questions.length && dynamicQuestions.length === 0) {
+                        const questionsToGenerate = survey.maxQuestions - survey.questions.length;
+                        await generateDynamicQuestions(questionsToGenerate);
+                      } else {
+                        // No dynamic questions to generate, submit survey
+                        await handleSubmit();
+                      }
+                    } else {
+                      // Just move to next question
+                      setCurrentQuestionIndex(Math.min(totalQuestions - 1, currentQuestionIndex + 1));
+                    }
+                  }}
+                  disabled={!canProceed || (isLastBaseQuestion && generatingDynamicQuestions)}
                 >
-                  Next
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  {isLastBaseQuestion && generatingDynamicQuestions ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating Questions...
+                    </>
+                  ) : isLastBaseQuestion && survey.goal && survey.maxQuestions && survey.maxQuestions > survey.questions.length && dynamicQuestions.length === 0 ? (
+                    <>
+                      Generate AI Questions
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
+
+
       </div>
     </div>
   );

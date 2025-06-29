@@ -24,6 +24,20 @@ export class CreateSurveyUseCase {
       // 2. Create survey entity
       const survey = Survey.create(request.title, request.description);
 
+      // 2.1. Set Phase 3 properties if provided
+      if (request.goal) {
+        survey.setGoal(request.goal);
+      }
+      if (request.maxQuestions) {
+        survey.setMaxQuestions(request.maxQuestions);
+      }
+      if (request.targetLanguage) {
+        survey.setTargetLanguage(request.targetLanguage);
+      }
+      if (request.autoTranslate !== undefined) {
+        survey.setAutoTranslate(request.autoTranslate);
+      }
+
       // 3. Add manual questions if provided
       if (request.questions) {
         request.questions.forEach(questionData => {
@@ -121,6 +135,10 @@ export class CreateSurveyUseCase {
       id: survey.getId(),
       title: survey.getTitle(),
       description: survey.getDescription(),
+      goal: survey.getGoal(), // Phase 3
+      maxQuestions: survey.getMaxQuestions(), // Phase 3
+      targetLanguage: survey.getTargetLanguage(), // Phase 3
+      autoTranslate: survey.getAutoTranslate(), // Phase 3
       questionCount: survey.getQuestionCount(),
       questions: survey.getQuestions().map(q => ({
         id: q.getId(),
@@ -139,10 +157,15 @@ export class CreateSurveyUseCase {
 
 /**
  * Request DTO for creating a survey
+ * Phase 3: Enhanced with new fields
  */
 export interface CreateSurveyRequest {
   title: string;
   description?: string;
+  goal?: string; // Phase 3: Survey goal
+  maxQuestions?: number; // Phase 3: Max questions limit
+  targetLanguage?: string; // Phase 3: Target language
+  autoTranslate?: boolean; // Phase 3: Auto-translate flag
   userId: string;
   useAI?: boolean;
   aiGenerationParams?: AIGenerationParams;
@@ -170,11 +193,16 @@ export interface AIGenerationParams {
 
 /**
  * Response DTO for survey creation
+ * Phase 3: Enhanced with new fields
  */
 export interface CreateSurveyResponse {
   id: string;
   title: string;
   description: string;
+  goal: string; // Phase 3
+  maxQuestions: number; // Phase 3
+  targetLanguage: string; // Phase 3
+  autoTranslate: boolean; // Phase 3
   questionCount: number;
   questions: {
     id: string;

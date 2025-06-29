@@ -258,6 +258,7 @@ export class AdminFirebaseSurveyRepository implements SurveyRepository {
 
   /**
    * Convert Survey entity to Firestore document
+   * Phase 3: Enhanced with new fields
    */
   private surveyToDocument(survey: Survey): any {
     if (!this.currentUserId) {
@@ -267,8 +268,13 @@ export class AdminFirebaseSurveyRepository implements SurveyRepository {
     return {
       title: survey.getTitle(),
       description: survey.getDescription(),
+      goal: survey.getGoal(),
       ownerId: this.currentUserId,
       questions: survey.getQuestions().map(this.questionToDocument),
+      dynamicQuestions: survey.getDynamicQuestions().map(this.questionToDocument),
+      maxQuestions: survey.getMaxQuestions(),
+      targetLanguage: survey.getTargetLanguage(),
+      autoTranslate: survey.getAutoTranslate(),
       isActive: survey.getIsActive(),
       createdAt: survey.getCreatedAt(),
       updatedAt: survey.getUpdatedAt()
@@ -277,15 +283,22 @@ export class AdminFirebaseSurveyRepository implements SurveyRepository {
 
   /**
    * Convert Firestore document to Survey entity
+   * Phase 3: Enhanced with new fields
    */
   private documentToSurvey(id: string, doc: any): Survey {
     const questions = (doc.questions || []).map(this.documentToQuestion);
+    const dynamicQuestions = (doc.dynamicQuestions || []).map(this.documentToQuestion);
     
     return Survey.fromPersistence(
       id,
       doc.title,
-      doc.description,
+      doc.description || '',
+      doc.goal || '', // Phase 3: Survey goal
       questions,
+      dynamicQuestions, // Phase 3: Dynamic questions
+      doc.maxQuestions || 10, // Phase 3: Max questions limit
+      doc.targetLanguage || 'en', // Phase 3: Target language
+      doc.autoTranslate || false, // Phase 3: Auto-translate flag
       doc.isActive,
       doc.createdAt?.toDate ? doc.createdAt.toDate() : new Date(doc.createdAt),
       doc.updatedAt?.toDate ? doc.updatedAt.toDate() : new Date(doc.updatedAt)

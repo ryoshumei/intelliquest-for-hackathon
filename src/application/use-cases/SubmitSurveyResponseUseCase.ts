@@ -69,8 +69,10 @@ export class SubmitSurveyResponseUseCase {
       for (const responseData of params.responses) {
         const questionId = QuestionId.fromString(responseData.questionId);
         
-        // Validate question exists in survey
+        // Validate question exists in survey (check both regular and dynamic questions)
         const question = survey.getQuestions().find(q => 
+          q.getId() === questionId.getValue()
+        ) || survey.getDynamicQuestions().find(q => 
           q.getId() === questionId.getValue()
         );
         

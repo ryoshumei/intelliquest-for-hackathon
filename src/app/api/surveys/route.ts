@@ -42,6 +42,10 @@ async function createSurvey(request: NextRequest) {
     const createSurveyRequest: CreateSurveyRequest = {
       title: body.title,
       description: body.description || '',
+      goal: body.goal || '', // Phase 3: Survey goal
+      maxQuestions: body.maxQuestions || 10, // Phase 3: Max questions
+      targetLanguage: body.targetLanguage || 'en', // Phase 3: Target language
+      autoTranslate: body.autoTranslate || false, // Phase 3: Auto-translate
       userId: user.getId(), // Use authenticated user's ID
       useAI: body.useAI || false,
       aiGenerationParams: body.aiGenerationParams,
@@ -143,28 +147,34 @@ async function getSurveys(request: NextRequest) {
           const responses = await responseRepository.findBySurveyId(survey.getId());
           const responseCount = responses.length;
           
+          const createdAt = survey.getCreatedAt();
+          const updatedAt = survey.getUpdatedAt();
+          
           return {
             id: survey.getId(),
             title: survey.getTitle(),
             description: survey.getDescription(),
-            questionCount: survey.getQuestionCount(),
+            questionCount: survey.getTotalQuestionCount(),
             isActive: survey.getIsActive(),
-            createdAt: survey.getCreatedAt().toISOString(),
-            updatedAt: survey.getUpdatedAt().toISOString(),
+            createdAt: createdAt instanceof Date ? createdAt.toISOString() : new Date(createdAt).toISOString(),
+            updatedAt: updatedAt instanceof Date ? updatedAt.toISOString() : new Date(updatedAt).toISOString(),
             userId: user.getId(),
             responseCount
           };
         } catch (error) {
           console.warn(`Failed to get response count for survey ${survey.getId()}:`, error);
           // Return survey without response count if there's an error
+          const createdAt = survey.getCreatedAt();
+          const updatedAt = survey.getUpdatedAt();
+          
           return {
             id: survey.getId(),
             title: survey.getTitle(),
             description: survey.getDescription(),
-            questionCount: survey.getQuestionCount(),
+            questionCount: survey.getTotalQuestionCount(),
             isActive: survey.getIsActive(),
-            createdAt: survey.getCreatedAt().toISOString(),
-            updatedAt: survey.getUpdatedAt().toISOString(),
+            createdAt: createdAt instanceof Date ? createdAt.toISOString() : new Date(createdAt).toISOString(),
+            updatedAt: updatedAt instanceof Date ? updatedAt.toISOString() : new Date(updatedAt).toISOString(),
             userId: user.getId(),
             responseCount: 0
           };

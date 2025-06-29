@@ -441,17 +441,19 @@ function DashboardContent() {
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                Recent Surveys
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  All Surveys ({surveys.length})
+                </h3>
+              </div>
               {isLoading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
                   <p className="mt-2 text-sm text-gray-500">Loading surveys...</p>
                 </div>
               ) : surveys.length > 0 ? (
-                <div className="space-y-4">
-                  {surveys.slice(0, 5).map((survey) => (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {surveys.map((survey) => (
                     <div key={survey.id} className="border rounded-lg p-4 hover:bg-gray-50">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -587,14 +589,21 @@ function DashboardContent() {
                           <div className="space-y-3">
                             {response.responses.map((answer, answerIndex) => (
                               <div key={answerIndex} className="bg-white p-3 rounded border">
-                                <div className="text-sm font-medium text-gray-900 mb-1">
-                                  {answer.questionText}
+                                <div className="flex items-start justify-between mb-1">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {answer.questionText}
+                                  </div>
+                                  {answer.questionId?.startsWith('dynamic-') && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                      AI Generated
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
                                   <span className="font-medium">Answer:</span> {formatAnswer(answer.answer)}
                                 </div>
                                 <div className="text-xs text-gray-500 mt-1">
-                                  Type: {answer.questionType} • Answered: {new Date(answer.answeredAt).toLocaleString()}
+                                  Type: {answer.questionType} • Answered: {answer.answeredAt ? new Date(answer.answeredAt).toLocaleString() : 'Unknown time'}
                                 </div>
                               </div>
                             ))}

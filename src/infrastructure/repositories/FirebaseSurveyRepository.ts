@@ -32,12 +32,18 @@ import {
 
 /**
  * Firestore document interface for Survey persistence
+ * Phase 3: Enhanced with new fields
  */
 interface SurveyDocument {
   title: string;
   description: string;
+  goal?: string; // Phase 3: Survey goal
   ownerId: string;
   questions: QuestionDocument[];
+  dynamicQuestions?: QuestionDocument[]; // Phase 3: AI-generated questions
+  maxQuestions?: number; // Phase 3: Maximum question limit
+  targetLanguage?: string; // Phase 3: Target language
+  autoTranslate?: boolean; // Phase 3: Auto-translate flag
   isActive: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -314,6 +320,7 @@ export class FirebaseSurveyRepository implements SurveyRepository {
 
   /**
    * Convert Survey entity to Firestore document
+   * Phase 3: Enhanced with new fields
    */
   private surveyToDocument(survey: Survey): SurveyDocument {
     if (!this.currentUserId) {
@@ -323,8 +330,13 @@ export class FirebaseSurveyRepository implements SurveyRepository {
     return {
       title: survey.getTitle(),
       description: survey.getDescription(),
+      goal: survey.getGoal(),
       ownerId: this.currentUserId,
       questions: survey.getQuestions().map(this.questionToDocument),
+      dynamicQuestions: survey.getDynamicQuestions().map(this.questionToDocument),
+      maxQuestions: survey.getMaxQuestions(),
+      targetLanguage: survey.getTargetLanguage(),
+      autoTranslate: survey.getAutoTranslate(),
       isActive: survey.getIsActive(),
       createdAt: Timestamp.fromDate(survey.getCreatedAt()),
       updatedAt: Timestamp.fromDate(survey.getUpdatedAt())
@@ -333,15 +345,22 @@ export class FirebaseSurveyRepository implements SurveyRepository {
 
   /**
    * Convert Firestore document to Survey entity
+   * Phase 3: Enhanced with new fields
    */
   private documentToSurvey(id: string, doc: SurveyDocument): Survey {
     const questions = doc.questions.map(this.documentToQuestion);
+    const dynamicQuestions = (doc.dynamicQuestions || []).map(this.documentToQuestion);
     
     return Survey.fromPersistence(
       id,
       doc.title,
-      doc.description,
+      doc.description || '',
+      doc.goal || '', // Phase 3: Survey goal
       questions,
+      dynamicQuestions, // Phase 3: Dynamic questions
+      doc.maxQuestions || 10, // Phase 3: Max questions limit
+      doc.targetLanguage || 'en', // Phase 3: Target language
+      doc.autoTranslate || false, // Phase 3: Auto-translate flag
       doc.isActive,
       doc.createdAt.toDate(),
       doc.updatedAt.toDate()

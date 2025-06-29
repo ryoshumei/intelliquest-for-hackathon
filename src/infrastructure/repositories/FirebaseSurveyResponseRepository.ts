@@ -158,6 +158,18 @@ export class FirebaseSurveyResponseRepository implements SurveyResponseRepositor
 
   private convertToSurveyResponse(data: any): SurveyResponse | null {
     try {
+      // Helper function to safely convert timestamps
+      const convertTimestamp = (timestamp: any): Date | null => {
+        if (!timestamp) return null;
+        if (timestamp?.toDate) return timestamp.toDate();
+        if (timestamp instanceof Date) return timestamp;
+        if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+          const date = new Date(timestamp);
+          return isNaN(date.getTime()) ? null : date;
+        }
+        return null;
+      };
+
       // Convert Firestore timestamps back to dates
       const responseData: SurveyResponseData = {
         id: data.id,
@@ -166,10 +178,10 @@ export class FirebaseSurveyResponseRepository implements SurveyResponseRepositor
         respondentEmail: data.respondentEmail,
         responses: data.responses?.map((r: any) => ({
           ...r,
-          answeredAt: r.answeredAt?.toDate() || new Date()
+          answeredAt: convertTimestamp(r.answeredAt) || new Date()
         })) || [],
-        startedAt: data.startedAt?.toDate() || new Date(),
-        submittedAt: data.submittedAt?.toDate(),
+        startedAt: convertTimestamp(data.startedAt) || new Date(),
+        submittedAt: convertTimestamp(data.submittedAt) || undefined,
         isComplete: data.isComplete || false,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,

@@ -31,6 +31,10 @@ export async function GET(
       id: survey.getId(),
       title: survey.getTitle(),
       description: survey.getDescription(),
+      goal: survey.getGoal(),
+      maxQuestions: survey.getMaxQuestions(),
+      targetLanguage: survey.getTargetLanguage(),
+      autoTranslate: survey.getAutoTranslate(),
       createdAt: survey.getCreatedAt(),
       updatedAt: survey.getUpdatedAt(),
       isPublished: survey.canBePublished(),
@@ -41,6 +45,16 @@ export async function GET(
         type: question.getType().getValue(),
         options: question.getOptions(),
         isRequired: question.getIsRequired(),
+        isAIGenerated: question.getIsAIGenerated(),
+        order: question.getOrder()
+      })),
+      dynamicQuestions: survey.getDynamicQuestions().map(question => ({
+        id: question.getId(),
+        text: question.getText(),
+        type: question.getType().getValue(),
+        options: question.getOptions(),
+        isRequired: question.getIsRequired(),
+        isAIGenerated: question.getIsAIGenerated(),
         order: question.getOrder()
       }))
     };

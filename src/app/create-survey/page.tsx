@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import { SurveyGoalSettings } from '@/components/survey/SurveyGoalSettings';
 import { 
   PlusIcon, 
   SparklesIcon, 
@@ -36,6 +37,10 @@ interface Question {
 interface Survey {
   title: string;
   description: string;
+  goal: string;
+  maxQuestions: number;
+  targetLanguage: string;
+  autoTranslate: boolean;
   questions: Question[];
 }
 
@@ -80,6 +85,10 @@ export default function CreateSurveyPage() {
   const [survey, setSurvey] = useState<Survey>({
     title: '',
     description: '',
+    goal: '',
+    maxQuestions: 10,
+    targetLanguage: 'en',
+    autoTranslate: false,
     questions: []
   });
 
@@ -158,12 +167,16 @@ export default function CreateSurveyPage() {
         body: JSON.stringify({
           title: survey.title,
           description: survey.description || 'Survey questions',
+          goal: survey.goal || 'Generate questions for survey creation',
+          maxQuestions: survey.maxQuestions,
+          targetLanguage: survey.targetLanguage,
+          autoTranslate: survey.autoTranslate,
           useAI: true,
           aiGenerationParams: {
             questionCount: aiQuestionCount,
             targetAudience: 'general',
             questionTypes: ['text', 'multiple_choice', 'rating'].map(type => mapFrontendTypeToBackend(type as Question['type'])),
-            surveyGoal: 'Generate questions for survey creation'
+            surveyGoal: survey.goal || 'Generate questions for survey creation'
           }
         }),
       });
@@ -241,6 +254,10 @@ export default function CreateSurveyPage() {
         body: JSON.stringify({
           title: survey.title,
           description: survey.description,
+          goal: survey.goal,
+          maxQuestions: survey.maxQuestions,
+          targetLanguage: survey.targetLanguage,
+          autoTranslate: survey.autoTranslate,
           useAI: false,
           questions: survey.questions.map(q => ({
             text: q.text,
@@ -274,7 +291,7 @@ export default function CreateSurveyPage() {
   };
 
   const progress = survey.questions.length > 0 ? 
-    Math.min((survey.questions.length / 10) * 100, 100) : 0;
+    Math.min((survey.questions.length / (survey.maxQuestions || 10)) * 100, 100) : 0;
 
   return (
     <TooltipProvider>
@@ -288,10 +305,6 @@ export default function CreateSurveyPage() {
                 <p className="text-muted-foreground">Design your survey with AI assistance</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <EyeIcon className="w-4 h-4 mr-2" />
-                  Preview
-                </Button>
                 <Button onClick={saveSurvey} size="sm">
                   <BookmarkIcon className="w-4 h-4 mr-2" />
                   Save Survey
@@ -341,6 +354,27 @@ export default function CreateSurveyPage() {
                       value={survey.description}
                       onChange={(e) => setSurvey(prev => ({ ...prev, description: e.target.value }))}
                       rows={3}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  {/* Phase 3: Survey Goal Settings */}
+                  <div>
+                    <SurveyGoalSettings
+                      config={{
+                        goal: survey.goal,
+                        maxQuestions: survey.maxQuestions,
+                        targetLanguage: survey.targetLanguage,
+                        autoTranslate: survey.autoTranslate
+                      }}
+                      onChange={(config) => setSurvey(prev => ({ 
+                        ...prev, 
+                        goal: config.goal,
+                        maxQuestions: config.maxQuestions,
+                        targetLanguage: config.targetLanguage,
+                        autoTranslate: config.autoTranslate
+                      }))}
                     />
                   </div>
 
