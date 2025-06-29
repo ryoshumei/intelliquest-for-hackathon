@@ -380,62 +380,7 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                Quick Actions
-              </h3>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <Link
-                  href="/create-survey"
-                  className="relative block w-full p-6 bg-white border-2 border-gray-300 border-dashed rounded-lg text-center hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path d="M8 14v20c0 4.418 7.163 8 16 8 1.381 0 2.721-.087 4-.252M8 14c0 4.418 7.163 8 16 8s16-3.582 16-8M8 14c0-4.418 7.163-8 16-8s16 3.582 16 8m0 0v14m-16-4c0 4.418 7.163 8 16 8 1.381 0 2.721-.087 4-.252" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span className="mt-2 block text-sm font-medium text-gray-900">
-                    Create New Survey
-                  </span>
-                  <span className="mt-1 block text-sm text-gray-500">
-                    Start building your next survey with AI assistance
-                  </span>
-                </Link>
 
-                <button
-                  onClick={() => alert('Manage Surveys feature coming soon!')}
-                  className="relative block w-full p-6 bg-white border border-gray-300 rounded-lg text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span className="mt-2 block text-sm font-medium text-gray-900">
-                    Manage Surveys
-                  </span>
-                  <span className="mt-1 block text-sm text-gray-500">
-                    View and edit your existing surveys
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => alert('Analytics feature coming soon!')}
-                  className="relative block w-full p-6 bg-white border border-gray-300 rounded-lg text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <span className="mt-2 block text-sm font-medium text-gray-900">
-                    View Analytics
-                  </span>
-                  <span className="mt-1 block text-sm text-gray-500">
-                    Analyze survey responses and insights
-                  </span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Recent Surveys */}
         <div className="px-4 py-6 sm:px-0">
@@ -474,16 +419,28 @@ function DashboardContent() {
                             {survey.isActive ? 'Active' : 'Draft'}
                           </span>
                           {(survey.responseCount || 0) > 0 && (
-                            <button
-                              onClick={() => viewSurveyResponses(survey.id, survey.title)}
-                              className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-blue-700 bg-blue-50 shadow-sm text-xs font-medium rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                              title="View responses"
-                            >
-                              <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              View Responses
-                            </button>
+                            <>
+                              <Link
+                                href={`/dashboard/analytics/${survey.id}`}
+                                className="inline-flex items-center px-3 py-1.5 border border-purple-300 text-purple-700 bg-purple-50 shadow-sm text-xs font-medium rounded hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                title="View analytics"
+                              >
+                                <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                Analytics
+                              </Link>
+                              <button
+                                onClick={() => viewSurveyResponses(survey.id, survey.title)}
+                                className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-blue-700 bg-blue-50 shadow-sm text-xs font-medium rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                title="View responses"
+                              >
+                                <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                View Responses
+                              </button>
+                            </>
                           )}
                           {survey.isActive && (
                             <button

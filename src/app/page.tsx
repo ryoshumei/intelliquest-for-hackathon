@@ -1,385 +1,281 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from './contexts/AuthContext';
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
-  const [testResult, setTestResult] = useState<{
-    status: 'idle' | 'loading' | 'success' | 'error';
-    message: string;
-    data?: Record<string, unknown> | null;
-  }>({
-    status: 'idle',
-    message: '测试结果将显示在这里...'
-  });
-
-  const testCreateSurvey = async () => {
-    setTestResult({ status: 'loading', message: '正在测试创建问卷...' });
-    
-    try {
-      const response = await fetch('/api/surveys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: '测试问卷 - 六角架构验证',
-          description: '这是一个用来验证六角架构实现的测试问卷',
-          userId: 'test-user-123',
-          useAI: false,
-          questions: [
-            {
-              text: '您对六角架构的理解如何？',
-              type: 'single_choice',
-              options: ['完全理解', '基本理解', '不太理解', '完全不理解'],
-              isRequired: true
-            }
-          ]
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        setTestResult({
-          status: 'success',
-          message: '✅ 创建成功！',
-          data: result
-        });
-      } else {
-        setTestResult({
-          status: 'error',
-          message: `❌ 创建失败: ${result.error || '未知错误'}`
-        });
-      }
-    } catch (error) {
-      setTestResult({
-        status: 'error',
-        message: `❌ 创建失败: ${error instanceof Error ? error.message : '网络错误'}`
-      });
-    }
-  };
-
-  const testCreateSurveyWithAI = async () => {
-    setTestResult({ status: 'loading', message: '正在测试 AI 问题生成...' });
-    
-    try {
-      const response = await fetch('/api/surveys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: 'AI 生成问卷测试',
-          description: '测试 Vertex AI 问题生成功能',
-          userId: 'test-user-ai-123',
-          useAI: true,
-          aiGenerationParams: {
-            topic: '用户体验',
-            questionCount: 3,
-            targetAudience: '产品用户',
-            surveyGoal: '收集用户反馈'
-          }
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok) {
-        setTestResult({
-          status: 'success',
-          message: `✅ AI 生成成功！生成了 ${result.questionCount || 0} 个问题`,
-          data: result
-        });
-      } else {
-        setTestResult({
-          status: 'error',
-          message: `❌ AI 生成失败: ${result.error || '未知错误'}`
-        });
-      }
-    } catch (error) {
-      setTestResult({
-        status: 'error',
-        message: `❌ AI 生成失败: ${error instanceof Error ? error.message : '网络错误'}`
-      });
-    }
-  };
-
-  const testGetSurveys = async () => {
-    setTestResult({ status: 'loading', message: '正在获取问卷列表...' });
-    
-    try {
-      const response = await fetch('/api/surveys');
-      const result = await response.json();
-      
-      if (response.ok) {
-        const surveyCount = result.surveys ? result.surveys.length : 0;
-        setTestResult({
-          status: 'success',
-          message: `✅ 获取成功！找到 ${surveyCount} 个问卷`,
-          data: result
-        });
-      } else {
-        setTestResult({
-          status: 'error',
-          message: `❌ 获取失败: ${result.error || '未知错误'}`
-        });
-      }
-    } catch (error) {
-      setTestResult({
-        status: 'error',
-        message: `❌ 获取失败: ${error instanceof Error ? error.message : '网络错误'}`
-      });
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            🧠 IntelliQuest
-          </h1>
-          <p className="text-xl text-gray-600 mb-2">
-            AI-Powered Survey Creation Platform
-          </p>
-          <p className="text-sm text-gray-500 mb-4">
-            Built with Hexagonal Architecture + Domain-Driven Design
-          </p>
-          
-          {/* Authentication Navigation */}
-          <div className="flex justify-center space-x-4">
-            {isAuthenticated ? (
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">
-                  Welcome, {user?.displayName}
-                </span>
-                <Link
-                  href="/create-survey"
-                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
-                >
-                  Create Survey
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Dashboard
-                </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Header */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">IQ</span>
+                </div>
               </div>
-            ) : (
-              <div className="space-x-4">
-                <Link
-                  href="/auth/login"
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  Sign In
-                </Link>
+              <div className="ml-4">
+                <h1 className="text-xl font-semibold text-gray-900">IntelliQuest</h1>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {isAuthenticated ? (
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">
+                    Welcome, {user?.displayName}
+                  </span>
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Dashboard
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-4">
+                  <Link
+                    href="/auth/login"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Get Started
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <div className="max-w-7xl mx-auto py-16 sm:px-6 lg:px-8">
+        <div className="px-4 py-16 sm:px-0">
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="px-6 py-16 sm:p-16 text-center">
+              <div className="max-w-3xl mx-auto">
+                <h1 className="text-4xl font-bold text-gray-900 sm:text-5xl md:text-6xl mb-6">
+                  Create Intelligent Surveys with
+                  <span className="text-indigo-600"> AI Power</span>
+                </h1>
+                <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                  Generate dynamic questions, collect meaningful responses, and gain valuable insights 
+                  with our AI-powered survey platform designed for modern teams.
+                </p>
+                {!isAuthenticated ? (
+                  <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <Link
+                      href="/auth/register"
+                      className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Start Creating Surveys
+                      <svg className="ml-2 -mr-1 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </Link>
+                    <Link
+                      href="/auth/login"
+                      className="inline-flex items-center px-8 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Sign In
+                    </Link>
+                  </div>
+                ) : (
+                  <Link
+                    href="/create-survey"
+                    className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Create New Survey
+                    <svg className="ml-2 -mr-1 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Features Grid */}
+        <div className="px-4 py-16 sm:px-0">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Everything you need to create amazing surveys
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Powerful features designed to help you collect better data and make informed decisions.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {/* AI Question Generation */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="ml-4 text-lg font-medium text-gray-900">
+                    AI Question Generation
+                  </h3>
+                </div>
+                <p className="text-gray-600">
+                  Generate intelligent, contextual questions automatically based on your survey goals and target audience.
+                </p>
+              </div>
+            </div>
+
+            {/* Dynamic Questions */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 bg-green-500 rounded-lg flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="ml-4 text-lg font-medium text-gray-900">
+                    Dynamic Questions
+                  </h3>
+                </div>
+                <p className="text-gray-600">
+                  Create adaptive surveys that adjust questions based on previous responses for better engagement.
+                </p>
+              </div>
+            </div>
+
+            {/* Real-time Analytics */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="ml-4 text-lg font-medium text-gray-900">
+                    Real-time Analytics
+                  </h3>
+                </div>
+                <p className="text-gray-600">
+                  Monitor responses as they come in with comprehensive analytics and exportable reports.
+                </p>
+              </div>
+            </div>
+
+            {/* Easy Sharing */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="ml-4 text-lg font-medium text-gray-900">
+                    Easy Sharing
+                  </h3>
+                </div>
+                <p className="text-gray-600">
+                  Share your surveys instantly with secure links and track completion rates in real-time.
+                </p>
+              </div>
+            </div>
+
+            {/* Multiple Question Types */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="ml-4 text-lg font-medium text-gray-900">
+                    Multiple Question Types
+                  </h3>
+                </div>
+                <p className="text-gray-600">
+                  Support for various question formats including multiple choice, rating scales, and open-ended questions.
+                </p>
+              </div>
+            </div>
+
+            {/* Data Export */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 bg-red-500 rounded-lg flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="ml-4 text-lg font-medium text-gray-900">
+                    Data Export
+                  </h3>
+                </div>
+                <p className="text-gray-600">
+                  Export your survey data in multiple formats including CSV and JSON for further analysis.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA Section */}
+        <div className="px-4 py-16 sm:px-0">
+          <div className="bg-indigo-700 overflow-hidden shadow rounded-lg">
+            <div className="px-6 py-16 sm:p-16 text-center">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Ready to create your first survey?
+              </h2>
+              <p className="text-xl text-indigo-200 mb-8 max-w-2xl mx-auto">
+                Join thousands of teams who trust IntelliQuest to collect valuable feedback and insights.
+              </p>
+              {!isAuthenticated ? (
                 <Link
                   href="/auth/register"
-                  className="bg-white text-indigo-600 border border-indigo-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors"
+                  className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white"
                 >
-                  Sign Up
+                  Get Started for Free
+                  <svg className="ml-2 -mr-1 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
                 </Link>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Architecture Overview */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-            🏛️ 六角架构 (Hexagonal Architecture) 实现
-          </h2>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-blue-800 mb-2">🎯 Domain Layer</h3>
-                <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• Survey Entity (业务规则)</li>
-                  <li>• Question Entity (问题类型)</li>
-                  <li>• Value Objects (ID, Type)</li>
-                  <li>• Domain Events (事件)</li>
-                </ul>
-              </div>
-              
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-green-800 mb-2">🔌 Application Layer</h3>
-                <ul className="text-sm text-green-700 space-y-1">
-                  <li>• CreateSurveyUseCase</li>
-                  <li>• AI Question Generator</li>
-                  <li>• Event Bus Service</li>
-                  <li>• Request/Response DTOs</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-purple-800 mb-2">🔧 Infrastructure Layer</h3>
-                <ul className="text-sm text-purple-700 space-y-1">
-                  <li>• MockSurveyRepository</li>
-                  <li>• MockAI Service</li>
-                  <li>• Event Bus Adapter</li>
-                  <li>• External API Clients</li>
-                </ul>
-              </div>
-              
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-orange-800 mb-2">🖥️ Interface Layer</h3>
-                <ul className="text-sm text-orange-700 space-y-1">
-                  <li>• NextJS API Routes</li>
-                  <li>• React Components</li>
-                  <li>• REST API Endpoints</li>
-                  <li>• User Interface</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Feature Showcase */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              🤖 AI 问题生成
-            </h3>
-            <p className="text-gray-600 mb-4">
-              使用 AI 智能生成问卷问题，支持多种题型和自定义主题。
-            </p>
-            <div className="space-y-2 text-sm text-gray-500">
-              <div>• 智能模型驱动</div>
-              <div>• 10+ 种问题类型</div>
-              <div>• 中英文双语支持</div>
-              <div>• 智能问题优化</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              🔄 混合交互模式
-            </h3>
-            <p className="text-gray-600 mb-4">
-              结合 AI 生成和人工编辑，创造最佳的问卷体验。
-            </p>
-            <div className="space-y-2 text-sm text-gray-500">
-              <div>• AI + Human 协作</div>
-              <div>• 实时问题预览</div>
-              <div>• 智能问题推荐</div>
-              <div>• 自适应问题流程</div>
-            </div>
-          </div>
-        </div>
-
-        {/* API Testing */}
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-            🧪 API 测试区域
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-700 mb-2">测试六角架构 API</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                点击下面的按钮测试我们的六角架构实现：
-              </p>
-              
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={testCreateSurvey}
-                  disabled={testResult.status === 'loading'}
-                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              ) : (
+                <Link
+                  href="/create-survey"
+                  className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-indigo-700 focus:ring-white"
                 >
-                  {testResult.status === 'loading' ? '测试中...' : '测试创建问卷'}
-                </button>
-                
-                <button
-                  onClick={testCreateSurveyWithAI}
-                  disabled={testResult.status === 'loading'}
-                  className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  {testResult.status === 'loading' ? '测试中...' : '测试 AI 生成'}
-                </button>
-                
-                <button
-                  onClick={testGetSurveys}
-                  disabled={testResult.status === 'loading'}
-                  className="bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  {testResult.status === 'loading' ? '测试中...' : '获取问卷列表'}
-                </button>
-              </div>
-            </div>
-            
-            {/* Test Results Display */}
-            <div className="bg-gray-50 p-4 rounded-lg min-h-[100px]">
-              <div className={`
-                ${testResult.status === 'loading' ? 'text-blue-600' : ''}
-                ${testResult.status === 'success' ? 'text-green-600' : ''}
-                ${testResult.status === 'error' ? 'text-red-600' : ''}
-                ${testResult.status === 'idle' ? 'text-gray-500' : ''}
-              `}>
-                {testResult.status === 'loading' && (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <span>{testResult.message}</span>
-                  </div>
-                )}
-                
-                {testResult.status !== 'loading' && (
-                  <p className="font-medium mb-2">{testResult.message}</p>
-                )}
-                
-                {testResult.data && (
-                  <div className="mt-3">
-                    <details className="cursor-pointer">
-                      <summary className="text-sm text-gray-600 hover:text-gray-800 select-none">
-                        点击查看详细响应数据 ▼
-                      </summary>
-                      <pre className="text-xs bg-white p-3 mt-2 rounded border overflow-x-auto max-h-64 overflow-y-auto">
-                        {JSON.stringify(testResult.data, null, 2)}
-                      </pre>
-                    </details>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Development Roadmap */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-            🗺️ 开发路线图
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">✓</span>
-              </div>
-              <span className="text-green-700 font-medium">Day 1-2: 六角架构基础搭建 (已完成)</span>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">🔄</span>
-              </div>
-              <span className="text-yellow-700 font-medium">Day 3-4: Firebase 集成 + AI 服务 (进行中)</span>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-                <span className="text-gray-600 text-xs font-bold">3</span>
-              </div>
-              <span className="text-gray-600">Day 5-6: 前端界面 + 实时功能</span>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-                <span className="text-gray-600 text-xs font-bold">4</span>
-              </div>
-              <span className="text-gray-600">Day 7: 部署上线 + 演示准备</span>
+                  Create Your First Survey
+                  <svg className="ml-2 -mr-1 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </Link>
+              )}
             </div>
           </div>
         </div>
