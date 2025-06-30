@@ -67,7 +67,7 @@ export default function SurveyResponsePage() {
 
   // Phase 3: Translation features
   const [supportedLanguages, setSupportedLanguages] = useState<SupportedLanguage[]>([]);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
   const [translatedQuestions, setTranslatedQuestions] = useState<Map<string, string>>(new Map());
   const [translatedOptions, setTranslatedOptions] = useState<Map<string, string[]>>(new Map());
   const [translatingQuestions, setTranslatingQuestions] = useState<Set<string>>(new Set());
@@ -116,13 +116,6 @@ export default function SurveyResponsePage() {
           if (!data.serviceStatus?.available) {
             console.warn('Translation service not available:', data.serviceStatus?.error);
           }
-          
-          // Auto-detect user's language
-          const userLang = navigator.language.split('-')[0];
-          const supportedLang = data.languages.find((lang: SupportedLanguage) => lang.code.startsWith(userLang));
-          if (supportedLang) {
-            setSelectedLanguage(supportedLang.code);
-          }
         } else {
           throw new Error(data.error || 'Failed to load languages');
         }
@@ -143,9 +136,70 @@ export default function SurveyResponsePage() {
     loadLanguages();
   }, []);
 
+  // Auto-detect content language when survey loads
+  useEffect(() => {
+    const detectInitialLanguage = async () => {
+      if (survey && survey.questions.length > 0 && !selectedLanguage && supportedLanguages.length > 0) {
+        try {
+          const firstQuestion = survey.questions[0];
+          console.log(`🔍 Auto-detecting language for survey content: "${firstQuestion.text.substring(0, 50)}..."`);
+          
+          const detectResponse = await fetch('/api/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'detect',
+              text: firstQuestion.text
+            }),
+          });
+
+          const detectData = await detectResponse.json();
+          const detectedLanguage = detectData.success && detectData.detectedLanguage ? detectData.detectedLanguage : '';
+          
+          console.log(`🎯 Detected survey content language: ${detectedLanguage || 'unknown'}`);
+
+          // Check if detected language is in supported languages
+          const supportedLang = detectedLanguage ? supportedLanguages.find(lang => lang.code === detectedLanguage) : null;
+          if (supportedLang) {
+            console.log(`✅ Setting initial language to detected: ${detectedLanguage}`);
+            setSelectedLanguage(detectedLanguage);
+            setDetectedLanguage(detectedLanguage);
+          } else {
+            // Fallback to user's browser language or English
+            const userLang = navigator.language.split('-')[0];
+            const userSupportedLang = supportedLanguages.find(lang => lang.code.startsWith(userLang));
+            const fallbackLang = userSupportedLang ? userSupportedLang.code : 'en';
+            
+            console.log(`⚠️ Detected language ${detectedLanguage || 'unknown'} not supported, falling back to: ${fallbackLang}`);
+            setSelectedLanguage(fallbackLang);
+            if (detectedLanguage) {
+              setDetectedLanguage(detectedLanguage);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to detect initial language:', error);
+          // Fallback to English if detection fails
+          setSelectedLanguage('en');
+        }
+      }
+    };
+
+    detectInitialLanguage();
+  }, [survey, supportedLanguages, selectedLanguage]);
+
+  // Clear translation cache when language changes
+  useEffect(() => {
+    if (selectedLanguage) { // Only clear if we have a selected language
+      setTranslatedQuestions(new Map());
+      setTranslatedOptions(new Map());
+    }
+  }, [selectedLanguage]);
+
   // Auto-translate current question when language changes
   useEffect(() => {
-    if (survey && selectedLanguage !== 'en' && currentQuestionIndex >= 0) {
+    if (survey && selectedLanguage && currentQuestionIndex >= 0) {
       const allQuestions = [...survey.questions, ...dynamicQuestions];
       const currentQuestion = allQuestions[currentQuestionIndex];
       if (currentQuestion && !translatedQuestions.has(currentQuestion.id)) {
@@ -155,24 +209,68 @@ export default function SurveyResponsePage() {
   }, [selectedLanguage, currentQuestionIndex, survey, dynamicQuestions]);
 
   const translateQuestion = async (question: Question) => {
-    if (selectedLanguage === 'en' || translatingQuestions.has(question.id)) return;
+    // Only skip if already translating this question
+    if (translatingQuestions.has(question.id)) return;
 
     setTranslatingQuestions(prev => new Set(prev).add(question.id));
 
     try {
-      // Translate question text
-      const questionResponse = await fetch('/api/translate', {
+      // First, detect the language of the question text
+      const detectResponse = await fetch('/api/translate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'translate',
-          text: question.text,
-          targetLanguage: selectedLanguage,
-          sourceLanguage: 'en'
+          action: 'detect',
+          text: question.text
         }),
       });
+
+                const detectData = await detectResponse.json();
+          const detectedLanguage = detectData.success && detectData.detectedLanguage ? detectData.detectedLanguage : 'unknown';
+
+          console.log(`🔍 Detected language: ${detectedLanguage} for text: "${question.text.substring(0, 50)}..."`);
+
+                    // Check if translation is needed
+          if (detectedLanguage === selectedLanguage) {
+            console.log(`✅ No translation needed: content already in ${selectedLanguage}`);
+            // Content is already in target language, no translation needed
+            setTranslatingQuestions(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(question.id);
+              return newSet;
+            });
+            return;
+          }
+
+          // If detection failed, we still attempt translation but without explicit source language
+          if (detectedLanguage === 'unknown') {
+            console.log(`⚠️ Language detection failed, attempting translation anyway`);
+          }
+
+      // If languages are different, proceed with translation
+      console.log(`🚀 Translating from ${detectedLanguage} to ${selectedLanguage}`);
+
+              // Translate question text
+        const translateRequest: any = {
+          action: 'translate',
+          text: question.text,
+          targetLanguage: selectedLanguage
+        };
+
+        // Only add sourceLanguage if detection was successful
+        if (detectedLanguage !== 'unknown') {
+          translateRequest.sourceLanguage = detectedLanguage;
+        }
+
+        const questionResponse = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(translateRequest),
+        });
 
       const questionData = await questionResponse.json();
 
@@ -186,17 +284,30 @@ export default function SurveyResponsePage() {
         
         for (const option of question.options) {
           try {
+            // Check if option needs translation by using the same detected language
+            if (detectedLanguage === selectedLanguage) {
+              // No translation needed, use original option
+              translatedOptionsList.push(option);
+              continue;
+            }
+
+            const optionTranslateRequest: any = {
+              action: 'translate',
+              text: option,
+              targetLanguage: selectedLanguage
+            };
+
+            // Only add sourceLanguage if detection was successful
+            if (detectedLanguage !== 'unknown') {
+              optionTranslateRequest.sourceLanguage = detectedLanguage;
+            }
+
             const optionResponse = await fetch('/api/translate', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                action: 'translate',
-                text: option,
-                targetLanguage: selectedLanguage,
-                sourceLanguage: 'en'
-              }),
+              body: JSON.stringify(optionTranslateRequest),
             });
 
             const optionData = await optionResponse.json();
@@ -226,7 +337,7 @@ export default function SurveyResponsePage() {
   };
 
   const translateAllQuestions = async () => {
-    if (!survey || selectedLanguage === 'en') return;
+    if (!survey) return;
 
     const allQuestions = [...survey.questions, ...dynamicQuestions];
     const questionsToTranslate = allQuestions.filter(q => 
@@ -799,7 +910,7 @@ export default function SurveyResponsePage() {
                   onValueChange={setSelectedLanguage}
                 >
                   <SelectTrigger className="w-48">
-                    <SelectValue />
+                    <SelectValue placeholder="Detecting language..." />
                   </SelectTrigger>
                   <SelectContent>
                     {supportedLanguages.map((lang) => (
@@ -814,23 +925,14 @@ export default function SurveyResponsePage() {
                 </Select>
               </div>
               
-              {selectedLanguage !== 'en' && (
+              {translatingQuestions.size > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={true}
                 >
-                  {translatingQuestions.size > 0 ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Translating...
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-4 h-4 mr-2" />
-                      Translation Status
-                    </>
-                  )}
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Translating...
                 </Button>
               )}
             </div>
@@ -853,7 +955,7 @@ export default function SurveyResponsePage() {
               {currentQuestion.isRequired && (
                 <span className="text-red-500 text-sm">*</span>
               )}
-              {selectedLanguage !== 'en' && !translatedQuestions.has(currentQuestion.id) && (
+              {selectedLanguage && !translatedQuestions.has(currentQuestion.id) && (
                 <Button
                   variant="ghost"
                   size="sm"
