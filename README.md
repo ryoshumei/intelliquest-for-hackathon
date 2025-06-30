@@ -4,7 +4,7 @@ An AI-powered survey platform that transforms survey creation through intelligen
 
 ## ✨ Features
 
-- **🤖 AI-Powered Question Generation**: Leverage Vertex AI (Gemini 2.5 Flash) to automatically generate contextual survey questions
+- **🤖 AI-Powered Question Generation**: Leverage Vertex AI (Gemini 2.5 Pro) to automatically generate contextual survey questions
 - **🔐 Firebase Authentication**: Secure user registration and login system
 - **📊 Real-time Survey Management**: Create, manage, and analyze surveys with live data
 - **📱 Responsive Design**: Modern UI that works seamlessly across all devices
