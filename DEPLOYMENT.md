@@ -34,9 +34,9 @@ cp .env.production.template .env.production
 
 #### Example configuration:
 ```bash
-export NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyBTzwA5k6-CDOuQ7-AdjiP7klMFm_r70-0"
-export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="intelliquest-hackathon.firebaseapp.com"
-export NEXT_PUBLIC_FIREBASE_PROJECT_ID="intelliquest-hackathon"
+export NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_FIREBASE_API_KEY_HERE"
+export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
+export NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
 # ... other configurations
 ```
 

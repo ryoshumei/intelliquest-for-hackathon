@@ -8,14 +8,15 @@ import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/fire
  */
 
 // Fallback configuration for development/testing when env vars are not available
+// IMPORTANT: These are placeholder values and should be replaced with real values in environment variables
 const fallbackConfig = {
-  apiKey: "AIzaSyBTzwA5k6-CDOuQ7-AdjiP7klMFm_r70-0",
-  authDomain: "intelliquest-hackathon.firebaseapp.com",
-  projectId: "intelliquest-hackathon",
-  storageBucket: "intelliquest-hackathon.firebasestorage.app",
-  messagingSenderId: "208023840695",
-  appId: "1:208023840695:web:62cd35eccc832f6e9d2a32",
-  measurementId: "G-M3BFHBD8F6"
+  apiKey: "your-api-key-here",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.firebasestorage.app",
+  messagingSenderId: "your-sender-id",
+  appId: "your-app-id",
+  measurementId: "your-measurement-id"
 };
 
 // Firebase project configuration
