@@ -58,16 +58,20 @@ export const GET = withAuth(async (
 
     const surveyTitle = survey.getTitle();
     const timestamp = new Date().toISOString().split('T')[0];
+    
+    // Encode filename to handle Unicode characters
+    const safeFilename = encodeURIComponent(`${surveyTitle}_responses_${timestamp}`);
 
     if (format === 'csv') {
       // Generate CSV content
       const csvContent = generateCSV(survey, responses);
       
+      // Return CSV content directly as string
       return new NextResponse(csvContent, {
         status: 200,
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${surveyTitle}_responses_${timestamp}.csv"`
+          'Content-Disposition': `attachment; filename="${safeFilename}.csv"; filename*=UTF-8''${safeFilename}.csv`
         }
       });
 
@@ -75,11 +79,14 @@ export const GET = withAuth(async (
       // Generate JSON export
       const jsonData = generateJSON(survey, responses);
       
-      return new NextResponse(JSON.stringify(jsonData, null, 2), {
+      // Return JSON content directly as string
+      const jsonString = JSON.stringify(jsonData, null, 2);
+      
+      return new NextResponse(jsonString, {
         status: 200,
         headers: {
-          'Content-Type': 'application/json',
-          'Content-Disposition': `attachment; filename="${surveyTitle}_responses_${timestamp}.json"`
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${safeFilename}.json"; filename*=UTF-8''${safeFilename}.json`
         }
       });
     }
@@ -101,7 +108,7 @@ export const GET = withAuth(async (
 
 function generateCSV(survey: any, responses: any[]): string {
   if (!responses || responses.length === 0) {
-    return 'No responses found';
+    return '\uFEFF' + 'No responses found';
   }
 
   // Get all questions from the survey
@@ -143,7 +150,8 @@ function generateCSV(survey: any, responses: any[]): string {
     return row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
   });
 
-  return [headers.join(','), ...rows].join('\n');
+  // Add BOM for proper UTF-8 encoding in Excel and other programs
+  return '\uFEFF' + [headers.join(','), ...rows].join('\n');
 }
 
 function generateJSON(survey: any, responses: any[]): any {
