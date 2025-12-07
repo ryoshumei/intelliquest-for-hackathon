@@ -1,6 +1,6 @@
 # Multi-stage build for optimized production image
 # Use standard node image with specific platform for better compatibility
-FROM --platform=linux/amd64 node:18 AS base
+FROM --platform=linux/amd64 node:20-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -29,6 +29,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
