@@ -62,3 +62,4 @@ next-env.d.ts
 /docs
 scripts/
 zenn/
+/cloudbuild.yaml
